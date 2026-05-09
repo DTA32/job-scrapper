@@ -57,6 +57,7 @@ output/*
 *.debug.html
 run.log
 *.log
+config.yaml.bak.*
 
 # Playwright
 playwright-report/
