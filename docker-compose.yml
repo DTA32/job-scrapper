@@ -12,6 +12,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      target: scraper-cli
     image: job-scraper:latest
     container_name: job-scraper
     restart: "no"
