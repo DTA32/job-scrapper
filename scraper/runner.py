@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Iterable
 
-from .config_loader import AppConfig
+from .config_loader import AppConfig, keyword_slug
 from .fetchers import CloudscraperFetcher, FetchChain, PlaywrightFetcher
 from .sites import SCRAPERS, Scraper
 from .sites._dates import parse_to_iso
@@ -19,8 +19,10 @@ def default_fetch_chain() -> FetchChain:
     return FetchChain([CloudscraperFetcher(), PlaywrightFetcher()])
 
 
-def _enrich_posted_at(jobs: list[Job]) -> None:
+def _enrich_jobs(jobs: list[Job], keyword: str) -> None:
     for job in jobs:
+        if job.get("matched_keyword") is None:
+            job["matched_keyword"] = keyword
         if job.get("posted_at") is None:
             job["posted_at"] = parse_to_iso(job.get("posted_date"))
 
@@ -48,29 +50,31 @@ def run_one(
     fields: frozenset[str],
     max_age_hours: int | None,
 ) -> None:
+    label = f"{scraper.name}:{keyword_slug(keyword)}"
     output_dir.mkdir(parents=True, exist_ok=True)
     json_path = output_dir / f"{scraper.name}.json"
     debug_path = output_dir / f"{scraper.name}.debug.html"
 
-    print(f"[{scraper.name}] fetching {scraper.url}")
+    print(f"[{label}] fetching {scraper.url}")
     html = fetcher.fetch(scraper.url)
     if not html:
-        print(f"[{scraper.name}] FAILED: no html", file=sys.stderr)
+        print(f"[{label}] FAILED: no html", file=sys.stderr)
         json_path.write_text(
-            json.dumps({"error": "fetch failed", "url": scraper.url}, indent=2)
+            json.dumps(
+                {"error": "fetch failed", "url": scraper.url, "keyword": keyword},
+                indent=2,
+            )
         )
         return
 
     debug_path.write_text(html)
-    print(
-        f"[{scraper.name}] saved raw html → {debug_path.name} ({len(html)} bytes)"
-    )
+    print(f"[{label}] saved raw html → {debug_path.name} ({len(html)} bytes)")
 
     jobs = scraper.parse(html)
     parsed_count = len(jobs)
-    print(f"[{scraper.name}] parsed {parsed_count} job(s)")
+    print(f"[{label}] parsed {parsed_count} job(s)")
 
-    _enrich_posted_at(jobs)
+    _enrich_jobs(jobs, keyword)
 
     cutoff: datetime | None = None
     if max_age_hours is not None:
@@ -79,7 +83,7 @@ def run_one(
         jobs = [j for j in jobs if _within_max_age(j, cutoff)]
         dropped = before - len(jobs)
         print(
-            f"[{scraper.name}] max_age={max_age_hours}h kept {len(jobs)}/{before} "
+            f"[{label}] max_age={max_age_hours}h kept {len(jobs)}/{before} "
             f"(dropped {dropped})"
         )
 
@@ -96,7 +100,7 @@ def run_one(
             indent=2,
         )
     )
-    print(f"[{scraper.name}] wrote {json_path.name}")
+    print(f"[{label}] wrote {json_path.name}")
 
 
 def _select_targets(config: AppConfig, requested: Iterable[str]) -> list[str]:
@@ -106,10 +110,17 @@ def _select_targets(config: AppConfig, requested: Iterable[str]) -> list[str]:
     return list(config.enabled_site_names())
 
 
+def _build_pairs(
+    config: AppConfig, sites: list[str], keywords: list[str]
+) -> list[tuple[str, str]]:
+    return [(keyword, site) for keyword in keywords for site in sites]
+
+
 def run(
     config: AppConfig,
     targets: Iterable[str] = (),
     output_dir: Path | None = None,
+    keywords: Iterable[str] | None = None,
 ) -> int:
     out = output_dir or config.output_dir
     if not out.is_absolute():
@@ -132,9 +143,16 @@ def run(
         )
         return 1
 
+    keyword_list = list(keywords) if keywords else list(config.keywords)
+    if not keyword_list:
+        print("[runner] no keywords to scrape", file=sys.stderr)
+        return 1
+
+    pairs = _build_pairs(config, selected, keyword_list)
     fetcher = default_fetch_chain()
 
-    def _process(name: str) -> None:
+    def _process(pair: tuple[str, str]) -> None:
+        keyword, name = pair
         site_cfg = config.site(name)
         if site_cfg is None:
             print(
@@ -143,32 +161,38 @@ def run(
             )
             return
         scraper_cls = SCRAPERS[name]
-        scraper = scraper_cls(url=site_cfg.url, limit=config.limit)
+        url = site_cfg.url_for(keyword)
+        scraper = scraper_cls(url=url, limit=config.limit)
+        keyword_dir = out / keyword_slug(keyword)
         run_one(
             scraper,
             fetcher,
-            out,
-            config.keyword,
+            keyword_dir,
+            keyword,
             config.fields_for(name),
             config.max_age_for(name),
         )
 
-    workers = max(1, min(config.concurrency, len(selected)))
-    if workers == 1 or len(selected) == 1:
-        for name in selected:
-            _process(name)
+    workers = max(1, min(config.concurrency, len(pairs)))
+    if workers == 1 or len(pairs) == 1:
+        for pair in pairs:
+            _process(pair)
         return 0
 
     print(
-        f"[runner] running {len(selected)} site(s) with concurrency={workers}",
+        f"[runner] running {len(pairs)} (keyword,site) pair(s) "
+        f"with concurrency={workers}",
         file=sys.stderr,
     )
     with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="scraper") as ex:
-        futures = {ex.submit(_process, name): name for name in selected}
+        futures = {ex.submit(_process, pair): pair for pair in pairs}
         for fut in as_completed(futures):
-            name = futures[fut]
+            keyword, name = futures[fut]
             try:
                 fut.result()
             except Exception as exc:
-                print(f"[{name}] thread error: {exc}", file=sys.stderr)
+                print(
+                    f"[{name}:{keyword_slug(keyword)}] thread error: {exc}",
+                    file=sys.stderr,
+                )
     return 0

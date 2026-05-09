@@ -20,23 +20,30 @@ class ConfigError(ValueError):
 class SiteConfig:
     name: str
     enabled: bool
-    url: str
+    url_template: str
     fields: tuple[str, ...] | None = None
     max_age_hours: int | None = None
 
     def effective_fields(self, default: tuple[str, ...]) -> tuple[str, ...]:
         return self.fields if self.fields is not None else default
 
+    def url_for(self, keyword: str) -> str:
+        return _resolve_url(self.name, self.url_template, _build_template_vars(keyword))
+
 
 @dataclass(frozen=True)
 class AppConfig:
-    keyword: str
+    keywords: tuple[str, ...]
     limit: int
     concurrency: int
     output_dir: Path
     default_fields: tuple[str, ...]
     max_age_hours: int | None
     sites: tuple[SiteConfig, ...]
+
+    @property
+    def keyword(self) -> str:
+        return self.keywords[0] if self.keywords else ""
 
     def site(self, name: str) -> SiteConfig | None:
         for site in self.sites:
@@ -63,11 +70,15 @@ class AppConfig:
         return self.max_age_hours
 
 
+def _slugify(keyword: str) -> str:
+    return keyword.strip().lower().replace(" ", "-")
+
+
 def _build_template_vars(keyword: str) -> dict[str, str]:
     stripped = keyword.strip()
     return {
         "keyword": quote(stripped),
-        "keyword_slug": stripped.lower().replace(" ", "-"),
+        "keyword_slug": _slugify(stripped),
         "keyword_plus": stripped.replace(" ", "+"),
     }
 
@@ -119,6 +130,30 @@ def _validate_fields(raw: object, source: str) -> tuple[str, ...]:
     return tuple(cleaned)
 
 
+def _resolve_keywords(raw: dict) -> tuple[str, ...]:
+    if "keywords" in raw:
+        value = raw["keywords"]
+        if not isinstance(value, list) or not value:
+            raise ConfigError("'keywords' must be a non-empty list of strings")
+        cleaned: list[str] = []
+        seen: set[str] = set()
+        for entry in value:
+            if not isinstance(entry, str) or not entry.strip():
+                raise ConfigError(f"'keywords' entries must be non-empty strings, got {entry!r}")
+            normalized = entry.strip()
+            if normalized in seen:
+                continue
+            seen.add(normalized)
+            cleaned.append(normalized)
+        return tuple(cleaned)
+
+    keyword = raw.get("keyword")
+    if isinstance(keyword, str) and keyword.strip():
+        return (keyword.strip(),)
+
+    raise ConfigError("config must define non-empty 'keywords' (list) or 'keyword' (string)")
+
+
 def load(path: Path) -> AppConfig:
     if not path.exists():
         raise ConfigError(f"config file not found: {path}")
@@ -127,9 +162,7 @@ def load(path: Path) -> AppConfig:
     if not isinstance(raw, dict):
         raise ConfigError(f"config root must be a mapping, got {type(raw).__name__}")
 
-    keyword = raw.get("keyword")
-    if not isinstance(keyword, str) or not keyword.strip():
-        raise ConfigError("config must define non-empty 'keyword'")
+    keywords = _resolve_keywords(raw)
 
     sites_raw = raw.get("sites")
     if not isinstance(sites_raw, dict) or not sites_raw:
@@ -142,15 +175,15 @@ def load(path: Path) -> AppConfig:
     else:
         default_fields = DEFAULT_FIELDS
 
-    template_vars = _build_template_vars(keyword)
     sites: list[SiteConfig] = []
+    sample_vars = _build_template_vars(keywords[0])
     for name, cfg in sites_raw.items():
         if not isinstance(cfg, dict):
             raise ConfigError(f"site '{name}' must be a mapping")
         template = cfg.get("url_template")
         if not isinstance(template, str) or not template:
             raise ConfigError(f"site '{name}' must define non-empty 'url_template'")
-        url = _resolve_url(name, template, template_vars)
+        _resolve_url(name, template, sample_vars)
         enabled = bool(cfg.get("enabled", True))
 
         site_fields: tuple[str, ...] | None = None
@@ -163,7 +196,7 @@ def load(path: Path) -> AppConfig:
             SiteConfig(
                 name=name,
                 enabled=enabled,
-                url=url,
+                url_template=template,
                 fields=site_fields,
                 max_age_hours=site_max_age,
             )
@@ -192,7 +225,7 @@ def load(path: Path) -> AppConfig:
     max_age_hours = _parse_max_age(raw.get("max_age_hours"), "max_age_hours")
 
     return AppConfig(
-        keyword=keyword.strip(),
+        keywords=keywords,
         limit=limit,
         concurrency=concurrency,
         output_dir=output_dir,
@@ -200,3 +233,7 @@ def load(path: Path) -> AppConfig:
         max_age_hours=max_age_hours,
         sites=tuple(sites),
     )
+
+
+def keyword_slug(keyword: str) -> str:
+    return _slugify(keyword)

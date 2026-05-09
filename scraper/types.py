@@ -5,6 +5,7 @@ from typing import TypedDict
 
 class Job(TypedDict):
     site: str
+    matched_keyword: str | None
     title: str
     company: str
     url: str | None
@@ -21,6 +22,7 @@ class Job(TypedDict):
 CANONICAL_FIELDS: frozenset[str] = frozenset(
     {
         "site",
+        "matched_keyword",
         "title",
         "company",
         "url",
@@ -35,12 +37,15 @@ CANONICAL_FIELDS: frozenset[str] = frozenset(
     }
 )
 
-MANDATORY_FIELDS: frozenset[str] = frozenset({"site", "title", "company", "url"})
+MANDATORY_FIELDS: frozenset[str] = frozenset(
+    {"site", "matched_keyword", "title", "company", "url"}
+)
 
 
 def empty_job(site: str, title: str, company: str) -> Job:
     return Job(
         site=site,
+        matched_keyword=None,
         title=title,
         company=company,
         url=None,

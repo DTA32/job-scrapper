@@ -12,7 +12,7 @@ from typing import Any
 import yaml
 from mcp.server.fastmcp import FastMCP
 
-from scraper.config_loader import AppConfig, ConfigError, load
+from scraper.config_loader import AppConfig, ConfigError, keyword_slug, load
 from scraper.runner import run as run_scraper
 
 DEFAULT_CONFIG_PATH = Path(os.environ.get("SCRAPER_CONFIG", "config.yaml"))
@@ -26,8 +26,10 @@ def _load_config(path: Path) -> AppConfig:
     return load(path)
 
 
-def _read_site_output(config: AppConfig, name: str) -> dict[str, Any] | None:
-    path = config.output_dir / f"{name}.json"
+def _read_site_output(
+    config: AppConfig, keyword: str, name: str
+) -> dict[str, Any] | None:
+    path = config.output_dir / keyword_slug(keyword) / f"{name}.json"
     if not path.exists():
         return None
     try:
@@ -55,16 +57,28 @@ def _atomic_write_yaml(path: Path, data: dict) -> None:
 
 @mcp.tool()
 def list_sites() -> dict[str, Any]:
-    """List sites declared in config.yaml with their enabled status."""
+    """List sites declared in config.yaml with their enabled status.
+
+    Each site shows its raw url_template plus a sample resolved URL formatted
+    against the first configured keyword. The full keyword list is also returned.
+    """
     try:
         config = _load_config(DEFAULT_CONFIG_PATH)
     except ConfigError as exc:
         return {"error": str(exc)}
+    sample_keyword = config.keywords[0] if config.keywords else ""
     return {
-        "keyword": config.keyword,
+        "keywords": list(config.keywords),
         "limit": config.limit,
         "sites": [
-            {"name": site.name, "enabled": site.enabled, "url": site.url}
+            {
+                "name": site.name,
+                "enabled": site.enabled,
+                "url_template": site.url_template,
+                "sample_url": (
+                    site.url_for(sample_keyword) if sample_keyword else None
+                ),
+            }
             for site in config.sites
         ],
     }
@@ -153,52 +167,76 @@ def update_config(patch: dict[str, Any]) -> dict[str, Any]:
 
 
 @mcp.tool()
-def scrape_jobs(sites: list[str] | None = None) -> dict[str, Any]:
+def scrape_jobs(
+    sites: list[str] | None = None,
+    keywords: list[str] | None = None,
+) -> dict[str, Any]:
     """Run the job scraper and return aggregated results.
 
     Args:
         sites: optional list of site names to scrape. When omitted, runs every
-            site marked enabled in config.yaml. CLI-style overrides (e.g.
-            disabled sites) work the same as `python -m scraper <name>`.
+            site marked enabled in config.yaml.
+        keywords: optional list of keywords to scrape. When omitted, runs every
+            keyword in config.yaml. Useful to ad-hoc query a single term without
+            editing config.yaml.
 
     Returns:
         dict with keys:
-            keyword: search term resolved from config.yaml
-            requested: list of site names actually attempted
-            results: list of per-site result objects
-                ({site, fields, count, jobs}) read from output/<name>.json.
-                Each job is a dict projected to the fields configured for that
-                site. The canonical field set is:
-                  site, title, company, url, location, salary, posted_date,
-                  posted_at, work_type, employment_type, experience_level,
-                  job_id.
-                Fields a site cannot extract are returned as null. The fields
-                a site emits are listed in `fields` for that site's result.
-            errors: list of {site, reason} for any sites that failed to write
+            keywords: list of keywords actually attempted
+            requested_sites: list of site names attempted (per keyword)
+            exit_code: scraper exit code
+            results: list grouped by keyword, each entry:
+                {keyword, sites: [{site, fields, count, jobs, ...}]}.
+                Each job is projected to the fields configured for that site
+                and stamped with `matched_keyword`. Canonical fields:
+                  site, matched_keyword, title, company, url, location,
+                  salary, posted_date, posted_at, work_type,
+                  employment_type, experience_level, job_id.
+                Fields a site cannot extract are returned as null.
+            errors: list of {keyword, site, reason} for any pair that failed
     """
     try:
         config = _load_config(DEFAULT_CONFIG_PATH)
     except ConfigError as exc:
         return {"error": str(exc)}
 
-    targets = list(sites) if sites else list(config.enabled_site_names())
-    exit_code = run_scraper(config, targets=targets)
+    target_sites = list(sites) if sites else list(config.enabled_site_names())
+    target_keywords = list(keywords) if keywords else list(config.keywords)
+
+    exit_code = run_scraper(
+        config, targets=target_sites, keywords=target_keywords
+    )
 
     results: list[dict[str, Any]] = []
     errors: list[dict[str, str]] = []
-    for name in targets:
-        payload = _read_site_output(config, name)
-        if payload is None:
-            errors.append({"site": name, "reason": "missing or invalid output JSON"})
-            continue
-        if isinstance(payload, dict) and "error" in payload:
-            errors.append({"site": name, "reason": str(payload.get("error"))})
-            continue
-        results.append({"site": name, **payload})
+    for keyword in target_keywords:
+        per_site: list[dict[str, Any]] = []
+        for name in target_sites:
+            payload = _read_site_output(config, keyword, name)
+            if payload is None:
+                errors.append(
+                    {
+                        "keyword": keyword,
+                        "site": name,
+                        "reason": "missing or invalid output JSON",
+                    }
+                )
+                continue
+            if isinstance(payload, dict) and "error" in payload:
+                errors.append(
+                    {
+                        "keyword": keyword,
+                        "site": name,
+                        "reason": str(payload.get("error")),
+                    }
+                )
+                continue
+            per_site.append({"site": name, **payload})
+        results.append({"keyword": keyword, "sites": per_site})
 
     return {
-        "keyword": config.keyword,
-        "requested": targets,
+        "keywords": target_keywords,
+        "requested_sites": target_sites,
         "exit_code": exit_code,
         "results": results,
         "errors": errors,
