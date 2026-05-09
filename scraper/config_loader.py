@@ -11,6 +11,10 @@ from .types import CANONICAL_FIELDS, MANDATORY_FIELDS
 
 DEFAULT_FIELDS: tuple[str, ...] = ("title", "company", "location", "url")
 
+FILTERABLE_FIELDS: frozenset[str] = frozenset(
+    {"location", "employment_type", "work_type"}
+)
+
 
 class ConfigError(ValueError):
     pass
@@ -23,6 +27,7 @@ class SiteConfig:
     url_template: str
     fields: tuple[str, ...] | None = None
     max_age_hours: int | None = None
+    filter: dict[str, list[str]] | None = None
 
     def effective_fields(self, default: tuple[str, ...]) -> tuple[str, ...]:
         return self.fields if self.fields is not None else default
@@ -39,6 +44,7 @@ class AppConfig:
     output_dir: Path
     default_fields: tuple[str, ...]
     max_age_hours: int | None
+    filter: dict[str, list[str]]
     sites: tuple[SiteConfig, ...]
 
     @property
@@ -68,6 +74,12 @@ class AppConfig:
         if cfg is not None and cfg.max_age_hours is not None:
             return cfg.max_age_hours
         return self.max_age_hours
+
+    def filter_for(self, site_name: str) -> dict[str, list[str]]:
+        cfg = self.site(site_name)
+        if cfg is not None and cfg.filter is not None:
+            return cfg.filter
+        return self.filter
 
 
 def _slugify(keyword: str) -> str:
@@ -128,6 +140,50 @@ def _validate_fields(raw: object, source: str) -> tuple[str, ...]:
             continue
         cleaned.append(entry)
     return tuple(cleaned)
+
+
+def _normalize_filter_value(raw: object, source: str) -> list[str]:
+    if isinstance(raw, str):
+        normalized = raw.strip().lower()
+        return [normalized] if normalized else []
+    if isinstance(raw, list):
+        cleaned: list[str] = []
+        for entry in raw:
+            if not isinstance(entry, str):
+                raise ConfigError(
+                    f"{source} entries must be strings, got {entry!r}"
+                )
+            normalized = entry.strip().lower()
+            if normalized:
+                cleaned.append(normalized)
+        return cleaned
+    raise ConfigError(
+        f"{source} must be a string or list of strings, got {type(raw).__name__}"
+    )
+
+
+def _validate_filter(raw: object, source: str) -> dict[str, list[str]]:
+    if raw is None:
+        return {}
+    if not isinstance(raw, dict):
+        raise ConfigError(f"{source} must be a mapping, got {type(raw).__name__}")
+    cleaned: dict[str, list[str]] = {}
+    for key, value in raw.items():
+        if not isinstance(key, str):
+            raise ConfigError(f"{source} keys must be strings, got {key!r}")
+        if key not in FILTERABLE_FIELDS:
+            print(
+                f"[config] warning: {source} contains unknown filter field "
+                f"'{key}'; will be ignored. allowed: {sorted(FILTERABLE_FIELDS)}",
+                file=sys.stderr,
+            )
+            continue
+        if value is None or value == "":
+            continue
+        items = _normalize_filter_value(value, f"{source}.{key}")
+        if items:
+            cleaned[key] = items
+    return cleaned
 
 
 def _resolve_keywords(raw: dict) -> tuple[str, ...]:
@@ -192,6 +248,10 @@ def load(path: Path) -> AppConfig:
 
         site_max_age = _parse_max_age(cfg.get("max_age_hours"), f"sites.{name}.max_age_hours")
 
+        site_filter: dict[str, list[str]] | None = None
+        if "filter" in cfg:
+            site_filter = _validate_filter(cfg["filter"], f"sites.{name}.filter")
+
         sites.append(
             SiteConfig(
                 name=name,
@@ -199,6 +259,7 @@ def load(path: Path) -> AppConfig:
                 url_template=template,
                 fields=site_fields,
                 max_age_hours=site_max_age,
+                filter=site_filter,
             )
         )
 
@@ -224,12 +285,15 @@ def load(path: Path) -> AppConfig:
 
     max_age_hours = _parse_max_age(raw.get("max_age_hours"), "max_age_hours")
 
+    global_filter = _validate_filter(raw.get("filter"), "filter")
+
     return AppConfig(
         keywords=keywords,
         limit=limit,
         concurrency=concurrency,
         output_dir=output_dir,
         default_fields=default_fields,
+        filter=global_filter,
         max_age_hours=max_age_hours,
         sites=tuple(sites),
     )

@@ -11,7 +11,7 @@ from .config_loader import AppConfig, keyword_slug
 from .fetchers import CloudscraperFetcher, FetchChain, PlaywrightFetcher
 from .sites import SCRAPERS, Scraper
 from .sites._dates import parse_to_iso
-from .sites._filter import project_jobs
+from .sites._filter import apply_filter, project_jobs
 from .types import Job
 
 
@@ -49,6 +49,7 @@ def run_one(
     keyword: str,
     fields: frozenset[str],
     max_age_hours: int | None,
+    content_filter: dict[str, list[str]],
 ) -> None:
     label = f"{scraper.name}:{keyword_slug(keyword)}"
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -87,6 +88,15 @@ def run_one(
             f"(dropped {dropped})"
         )
 
+    if content_filter:
+        before = len(jobs)
+        jobs = apply_filter(jobs, content_filter)
+        dropped = before - len(jobs)
+        print(
+            f"[{label}] filter={content_filter} kept {len(jobs)}/{before} "
+            f"(dropped {dropped})"
+        )
+
     projected = project_jobs(jobs, fields)
     json_path.write_text(
         json.dumps(
@@ -94,6 +104,7 @@ def run_one(
                 "keyword": keyword,
                 "fields": sorted(fields),
                 "max_age_hours": max_age_hours,
+                "filter": content_filter or None,
                 "count": len(projected),
                 "jobs": projected,
             },
@@ -171,6 +182,7 @@ def run(
             keyword,
             config.fields_for(name),
             config.max_age_for(name),
+            config.filter_for(name),
         )
 
     workers = max(1, min(config.concurrency, len(pairs)))
