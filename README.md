@@ -96,6 +96,7 @@ writes, and keeps a timestamped backup. See [`docs/mcp.md`](docs/mcp.md).
 - [`docs/sites.md`](docs/sites.md) — per-site coverage and quirks
 - [`docs/architecture.md`](docs/architecture.md) — package map and request flow
 - [`docs/orchestration.md`](docs/orchestration.md) — cron + Claude + Discord automated flow
+- [`docs/deploy.md`](docs/deploy.md) — GitHub Actions deploy pipeline
 
 ## Project layout
 

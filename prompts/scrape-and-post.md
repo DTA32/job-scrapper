@@ -53,28 +53,28 @@ If the per-site result has `count: 0`, skip silently (don't post a
 
 ## Step 3 — Post each job to Discord
 
-Read the bot token from `/home/node/.claude/channels/discord/.env`.
+Both the bot token and the channel ID come from the bot container's
+environment:
 
-Read the destination channel ID from the env var `DISCORD_CHANNEL_ID`
-(provided by the bot container's environment).
+- `DISCORD_BOT_TOKEN` — Discord application bot token (with
+  `Send Messages` permission in the target channel)
+- `DISCORD_CHANNEL_ID` — destination channel ID
 
 Send each job as a **separate message** to that channel. One API call
-per job. Loop through all jobs and send individually via `node` —
-export `BOT_TOKEN`, `CHANNEL_ID`, and `MSG` as env vars, never inline:
+per job. Loop through all jobs and post individually via `node` — read
+the env vars inside the script, never inline the token:
 
 ```sh
-export BOT_TOKEN=<token>
-export CHANNEL_ID=$DISCORD_CHANNEL_ID
 export MSG=<formatted message for one job>
 node -e "
 const https = require('https');
 const body = JSON.stringify({content: process.env.MSG});
 const req = https.request({
   hostname: 'discord.com',
-  path: '/api/v10/channels/' + process.env.CHANNEL_ID + '/messages',
+  path: '/api/v10/channels/' + process.env.DISCORD_CHANNEL_ID + '/messages',
   method: 'POST',
   headers: {
-    'Authorization': 'Bot ' + process.env.BOT_TOKEN,
+    'Authorization': 'Bot ' + process.env.DISCORD_BOT_TOKEN,
     'Content-Type': 'application/json',
     'Content-Length': Buffer.byteLength(body)
   }

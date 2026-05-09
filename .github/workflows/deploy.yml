@@ -1,0 +1,145 @@
+name: Build & Deploy scraper
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-mcp:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image_tag_sha: ${{ steps.tags.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set image tags
+        id: tags
+        run: |
+          REPO_LOWER=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')
+          echo "latest=ghcr.io/${REPO_LOWER}:mcp-latest" >> "$GITHUB_OUTPUT"
+          echo "sha=ghcr.io/${REPO_LOWER}:mcp-${{ github.sha }}" >> "$GITHUB_OUTPUT"
+
+      - name: Login to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build & push mcp-server image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          target: mcp-server
+          push: true
+          cache-from: type=gha,scope=mcp
+          cache-to: type=gha,mode=max,scope=mcp
+          tags: |
+            ${{ steps.tags.outputs.latest }}
+            ${{ steps.tags.outputs.sha }}
+
+  build-bot:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image_tag_sha: ${{ steps.tags.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set image tags
+        id: tags
+        run: |
+          REPO_LOWER=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')
+          echo "latest=ghcr.io/${REPO_LOWER}:bot-latest" >> "$GITHUB_OUTPUT"
+          echo "sha=ghcr.io/${REPO_LOWER}:bot-${{ github.sha }}" >> "$GITHUB_OUTPUT"
+
+      - name: Login to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build & push bot image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          target: bot
+          push: true
+          cache-from: type=gha,scope=bot
+          cache-to: type=gha,mode=max,scope=bot
+          tags: |
+            ${{ steps.tags.outputs.latest }}
+            ${{ steps.tags.outputs.sha }}
+
+  deploy-mcp:
+    needs: build-mcp
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy scraper-mcp
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          envs: IMAGE_TAG,CONTAINER_NAME
+          script: |
+            set -euo pipefail
+            docker pull "$IMAGE_TAG"
+            docker stop "$CONTAINER_NAME" || true
+            docker rm "$CONTAINER_NAME" || true
+            docker run -d \
+              --name "$CONTAINER_NAME" \
+              --restart unless-stopped \
+              -p 8080:8080 \
+              "$IMAGE_TAG"
+            docker ps --filter "name=$CONTAINER_NAME"
+        env:
+          IMAGE_TAG: ${{ needs.build-mcp.outputs.image_tag_sha }}
+          CONTAINER_NAME: scraper-mcp
+
+  deploy-bot:
+    needs: [build-bot, deploy-mcp]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy scraper-bot
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          envs: IMAGE_TAG,CONTAINER_NAME,CLAUDE_CONFIG_DIR,CLAUDE_CONFIG_FILE,DISCORD_BOT_TOKEN,DISCORD_CHANNEL_ID
+          script: |
+            set -euo pipefail
+            docker pull "$IMAGE_TAG"
+            docker stop "$CONTAINER_NAME" || true
+            docker rm "$CONTAINER_NAME" || true
+            docker run -d \
+              --name "$CONTAINER_NAME" \
+              --restart unless-stopped \
+              --add-host=host.docker.internal:host-gateway \
+              -v "$CLAUDE_CONFIG_DIR:/home/node/.claude" \
+              -v "$CLAUDE_CONFIG_FILE:/home/node/.claude.json" \
+              -e DISCORD_BOT_TOKEN="$DISCORD_BOT_TOKEN" \
+              -e DISCORD_CHANNEL_ID="$DISCORD_CHANNEL_ID" \
+              "$IMAGE_TAG"
+            docker ps --filter "name=$CONTAINER_NAME"
+        env:
+          IMAGE_TAG: ${{ needs.build-bot.outputs.image_tag_sha }}
+          CONTAINER_NAME: scraper-bot
+          CLAUDE_CONFIG_DIR: ${{ vars.CLAUDE_CONFIG_DIR }}
+          CLAUDE_CONFIG_FILE: ${{ vars.CLAUDE_CONFIG_FILE }}
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          DISCORD_CHANNEL_ID: ${{ secrets.DISCORD_CHANNEL_ID }}
