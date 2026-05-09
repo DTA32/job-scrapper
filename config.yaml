@@ -8,7 +8,9 @@ output_dir: output
 
 # Drop jobs older than this many hours. Comment out / remove for no filter.
 # Per-site override available under sites.<name>.max_age_hours.
-max_age_hours: 720
+# Pair this value with the URL templates below: jobstreet/indeed take a "1"
+# (days) and linkedin takes seconds (e.g. r86400 = 24h).
+max_age_hours: 24
 
 # Fields included by default for every site (canonical names).
 # Allowed: title, company, url, location, salary, posted_date, posted_at,
@@ -21,11 +23,12 @@ default_fields:
   - url
   - salary
   - posted_date
+  - posted_at
 
 sites:
   jobstreet:
     enabled: true
-    url_template: "https://id.jobstreet.com/id/{keyword_slug}-jobs"
+    url_template: "https://id.jobstreet.com/id/{keyword_slug}-jobs?daterange=1"
 
   glints:
     enabled: true
@@ -37,19 +40,21 @@ sites:
       - url
       - salary
       - posted_date
+      - posted_at
       - work_type
       - experience_level
 
   linkedin:
     enabled: true
-    url_template: "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords={keyword}&location=Indonesia&start=0"
+    url_template: "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords={keyword}&location=Indonesia&f_TPR=r86400&start=0"
     fields:
       - title
       - company
       - location
       - url
       - posted_date
+      - posted_at
 
   indeed:
     enabled: true
-    url_template: "https://id.indeed.com/jobs?q={keyword_plus}&l=Indonesia"
+    url_template: "https://id.indeed.com/jobs?q={keyword_plus}&l=Indonesia&fromage=1"

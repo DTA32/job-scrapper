@@ -1,9 +1,41 @@
 from __future__ import annotations
 
+import re
+from datetime import datetime, timezone
+
 from bs4 import BeautifulSoup
 
 from ..types import Job, empty_job
 from .base import Scraper
+
+_RELATIVE_TIME_RE = re.compile(r'"formattedRelativeTime":"([^"]+)"')
+_PUB_DATE_RE = re.compile(r'"pubDate":(\d+)')
+_JOBKEY_RE = re.compile(r'"jobkey":"([0-9a-f]+)"')
+
+
+def _extract_date_map(html: str) -> dict[str, dict[str, str]]:
+    rels = _RELATIVE_TIME_RE.findall(html)
+    pubs = _PUB_DATE_RE.findall(html)
+    jks = _JOBKEY_RE.findall(html)
+
+    mapping: dict[str, dict[str, str]] = {}
+    for index, jobkey in enumerate(jks):
+        if jobkey in mapping:
+            continue
+        info: dict[str, str] = {}
+        if index < len(rels):
+            info["posted_date"] = rels[index]
+        if index < len(pubs):
+            try:
+                seconds = int(pubs[index]) / 1000
+                info["posted_at"] = datetime.fromtimestamp(
+                    seconds, tz=timezone.utc
+                ).isoformat()
+            except (ValueError, OSError):
+                pass
+        if info:
+            mapping[jobkey] = info
+    return mapping
 
 
 class IndeedScraper(Scraper):
@@ -11,6 +43,7 @@ class IndeedScraper(Scraper):
 
     def parse(self, html: str) -> list[Job]:
         soup = BeautifulSoup(html, "lxml")
+        date_map = _extract_date_map(html)
         cards = (
             soup.select("div.job_seen_beacon")
             or soup.select("td.resultContent")
@@ -46,11 +79,6 @@ class IndeedScraper(Scraper):
                 or card.select_one(".salary-snippet-container")
                 or card.select_one(".metadata.salary-snippet-container")
             )
-            posted_el = (
-                card.select_one("[data-testid='myJobsStateDate']")
-                or card.select_one("span.date")
-                or card.select_one(".date")
-            )
 
             title = title_el.get_text(" ", strip=True) if title_el else None
             if title_el and not title and title_el.has_attr("title"):
@@ -62,7 +90,6 @@ class IndeedScraper(Scraper):
             company = company_el.get_text(" ", strip=True) if company_el else None
             location = loc_el.get_text(" ", strip=True) if loc_el else None
             salary = salary_el.get_text(" ", strip=True) if salary_el else None
-            posted_date = posted_el.get_text(" ", strip=True) if posted_el else None
 
             url: str | None = None
             jk: str | None = None
@@ -90,7 +117,11 @@ class IndeedScraper(Scraper):
             job["url"] = url
             job["job_id"] = jk
             job["salary"] = salary
-            job["posted_date"] = posted_date
+
+            date_info = date_map.get(jk) if jk else None
+            if date_info:
+                job["posted_date"] = date_info.get("posted_date")
+                job["posted_at"] = date_info.get("posted_at")
 
             results.append(job)
             if len(results) >= self.limit:
