@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Iterable
 
@@ -83,15 +84,35 @@ def run(
         return 1
 
     fetcher = default_fetch_chain()
-    for name in selected:
+
+    def _process(name: str) -> None:
         site_cfg = config.site(name)
         if site_cfg is None:
             print(
                 f"[runner] '{name}' has no entry in config.yaml; skipping",
                 file=sys.stderr,
             )
-            continue
+            return
         scraper_cls = SCRAPERS[name]
         scraper = scraper_cls(url=site_cfg.url, limit=config.limit)
         run_one(scraper, fetcher, out, config.keyword)
+
+    workers = max(1, min(config.concurrency, len(selected)))
+    if workers == 1 or len(selected) == 1:
+        for name in selected:
+            _process(name)
+        return 0
+
+    print(
+        f"[runner] running {len(selected)} site(s) with concurrency={workers}",
+        file=sys.stderr,
+    )
+    with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="scraper") as ex:
+        futures = {ex.submit(_process, name): name for name in selected}
+        for fut in as_completed(futures):
+            name = futures[fut]
+            try:
+                fut.result()
+            except Exception as exc:
+                print(f"[{name}] thread error: {exc}", file=sys.stderr)
     return 0

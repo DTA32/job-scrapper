@@ -1,5 +1,6 @@
 keyword: software engineer
 limit: 2
+concurrency: 2
 output_dir: output
 
 sites:
