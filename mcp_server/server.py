@@ -114,7 +114,7 @@ def update_config(patch: dict[str, Any]) -> dict[str, Any]:
 
     Args:
         patch: dict to merge in. Examples:
-            {"keyword": "data analyst"}
+            {"keywords": ["data analyst"]}
             {"max_age_hours": 24}
             {"sites": {"linkedin": {"enabled": false}}}
             {"sites": {"glints": {"max_age_hours": 12}}}
@@ -182,18 +182,25 @@ def scrape_jobs(
 
     Returns:
         dict with keys:
+            ok: true when every requested site was reached, regardless of job
+                count. Zero jobs with ok=true means the site responded but
+                nothing matched your filters or date range — this is normal,
+                not an error. ok=false means at least one site failed to fetch.
             keywords: list of keywords actually attempted
             requested_sites: list of site names attempted (per keyword)
-            exit_code: scraper exit code
+            exit_code: scraper exit code (0 = ran without fatal error;
+                does NOT reflect per-site fetch success — use ok for that)
             results: list grouped by keyword, each entry:
                 {keyword, sites: [{site, fields, count, jobs, ...}]}.
-                Each job is projected to the fields configured for that site
-                and stamped with `matched_keyword`. Canonical fields:
-                  site, matched_keyword, title, company, url, location,
-                  salary, posted_date, posted_at, work_type,
-                  employment_type, experience_level, job_id.
-                Fields a site cannot extract are returned as null.
-            errors: list of {keyword, site, reason} for any pair that failed
+                A site entry is absent from this list when its fetch failed
+                (see errors). Each job is projected to the fields configured
+                for that site and stamped with `matched_keyword`. Canonical
+                fields: site, matched_keyword, title, company, url, location,
+                salary, posted_date, posted_at, work_type, employment_type,
+                experience_level, job_id. Fields a site cannot extract are
+                returned as null.
+            errors: list of {keyword, site, reason} for any pair that failed.
+                Presence of entries here means ok=false.
     """
     try:
         config = _load_config(DEFAULT_CONFIG_PATH)
@@ -235,6 +242,7 @@ def scrape_jobs(
         results.append({"keyword": keyword, "sites": per_site})
 
     return {
+        "ok": len(errors) == 0,
         "keywords": target_keywords,
         "requested_sites": target_sites,
         "exit_code": exit_code,
