@@ -31,27 +31,35 @@ If `exit_code != 0` or `errors` is non-empty, include a one-line
 diagnostic at the top of the Discord output. Continue and post whatever
 jobs DID land — partial output beats silence.
 
-## Step 2 — Format per job
+## Step 2 — Pull formatting config
 
-For each job in `results[*].sites[*].jobs`, build a Discord message using
-this template (adjust spacing as needed):
+Read these from `/workspace/config.yaml` using `yq` (already in PATH):
 
-```
-## {title}
-{company} | {location} | {posted_date} | [link]({url})
-
-**Matched**: {matched_keyword} on {site}
-{salary if present}
-{work_type if present} · {employment_type if present}
+```sh
+TEMPLATE="$(yq -r '.bot.message_template' /workspace/config.yaml)"
+MAX_CHARS="$(yq -r '.bot.max_chars // 1900' /workspace/config.yaml)"
 ```
 
-Skip optional lines (salary, work_type, employment_type) when the value
-is null. Anchors (`title`, `company`, `url`) are always present.
+`TEMPLATE` carries `{placeholder}` tokens that match canonical Job field
+names (e.g. `{title}`, `{company}`, `{location}`, `{posted_date}`,
+`{url}`, `{matched_keyword}`, `{site}`, `{salary}`, `{work_type}`,
+`{employment_type}`, `{experience_level}`, `{job_id}`, `{posted_at}`).
+
+## Step 3 — Format per job
+
+For each job in `results[*].sites[*].jobs`, substitute every
+`{field_name}` placeholder in `TEMPLATE` with the job's value for that
+field. If a referenced field is null/missing, drop the line containing
+that placeholder rather than emitting a literal `null`. Anchors
+(`title`, `company`, `url`) are always present.
 
 If the per-site result has `count: 0`, skip silently (don't post a
 "no jobs found" message — too noisy).
 
-## Step 3 — Post each job to Discord
+If a final formatted message exceeds `MAX_CHARS`, truncate to fit and
+append `…` to the truncated line.
+
+## Step 4 — Post each job to Discord
 
 Both the bot token and the channel ID come from the bot container's
 environment:
@@ -86,7 +94,7 @@ req.write(body); req.end();
 "
 ```
 
-## Step 4 — Summary footer (optional)
+## Step 5 — Summary footer (optional)
 
 After all individual job messages, send one final summary line:
 
@@ -103,5 +111,5 @@ Skip this footer if `total_jobs == 0` (the run produced nothing useful).
   scraper's behavior — change config separately when needed.
 - Deduplicate within a single run if the same `url` appears under
   multiple keywords (rare but possible). Post each unique URL once.
-- Keep individual messages under 2000 characters (Discord limit). Truncate
-  the longest line if needed and append `…`.
+- The `bot.message_template` and `bot.max_chars` are loaded fresh on
+  every run, so an edit + redeploy is enough — no prompt rewrite needed.

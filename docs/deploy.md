@@ -120,9 +120,11 @@ Because everything is baked in:
 | Want to… | How |
 |---|---|
 | Change `keyword`, `limit`, `filter` | Edit `config.yaml` → push to `main` |
+| Change cron schedule | Edit `bot.schedule` in `config.yaml` → push to `main` (bot Dockerfile reads it via `yq` at build time) |
+| Change Discord message format | Edit `bot.message_template` in `config.yaml` → push to `main` (read fresh each run, no rebuild needed) |
+| Change Discord per-message cap | Edit `bot.max_chars` in `config.yaml` → push to `main` |
 | Change Discord channel | Update `DISCORD_CHANNEL_ID` GitHub secret → push to main (or manual deploy) |
 | Change bot prompt | Edit `prompts/scrape-and-post.md` → push to `main` |
-| Change schedule | Edit `cron/scraper-crontab` → push to `main` |
 | Rotate Discord bot token | Update `DISCORD_BOT_TOKEN` secret → push to main |
 | Rotate Claude session | Re-run `claude login` on the VPS as `ubuntu` user — bot picks it up on next start |
 
@@ -169,21 +171,47 @@ docker run -d --name scraper-bot --restart unless-stopped \
 
 ## Local sanity check
 
+### Quick image build
+
 Build either image locally before pushing to main:
 
 ```bash
-# MCP
 docker build --target mcp-server -t job-scraper-mcp:local .
-docker run --rm -p 8080:8080 job-scraper-mcp:local
-
-# Bot (won't have secrets but will start supercronic)
 docker build --target bot -t job-scraper-bot:local .
-docker run --rm \
-  -e DISCORD_BOT_TOKEN=fake -e DISCORD_CHANNEL_ID=fake \
-  job-scraper-bot:local
 ```
 
 If both boot, the same Dockerfile targets will build in CI.
+
+### End-to-end test (skip cron, fire one-shot)
+
+`scripts/test-locally.sh` builds both images, starts the MCP server,
+and fires the bot's `run-scraper.sh` once — same code path supercronic
+would trigger, but synchronous and immediate.
+
+```bash
+export DISCORD_BOT_TOKEN=<your bot token>
+export DISCORD_CHANNEL_ID=<test channel id>
+./scripts/test-locally.sh
+```
+
+The script:
+1. Builds `mcp-server` and `bot` Dockerfile targets
+2. Starts a local `scraper-mcp-test` container on port 8080
+3. Waits for the MCP server to respond
+4. Runs the bot container with your `~/.claude` config bind-mounted
+   (for Claude session auth) and the secrets injected, executing
+   `run-scraper.sh` once
+5. Cleans up the MCP container on exit
+
+If the bot's prompt completes successfully, you'll see Discord messages
+appear in the test channel.
+
+### Tweaks via env
+
+```bash
+CLAUDE_CONFIG_DIR=~/work-claude ./scripts/test-locally.sh    # different config dir
+MCP_NAME=my-scraper-test ./scripts/test-locally.sh           # different test container name
+```
 
 ## Bot's first run on a new schedule
 

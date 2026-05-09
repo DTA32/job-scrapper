@@ -6,6 +6,26 @@ limit: 2
 concurrency: 2
 output_dir: output
 
+# Bot-side settings. Read by the scraper-bot image (cron + Discord posting).
+# Change here, push, redeploy.
+bot:
+  # Supercronic schedule (5-field cron OR @every / @daily / @hourly).
+  # Evaluated in the container's timezone — set TZ env on the bot container
+  # to control (workflow defaults to Asia/Jakarta).
+  schedule: "0 10 * * *"
+
+  # Max characters per Discord message. Discord allows 2000; keep margin.
+  max_chars: 1900
+
+  # Per-job Discord message template. Bot interpolates {field} placeholders
+  # against each job's canonical fields. Skip lines whose value is null.
+  message_template: |
+    ## {title}
+    {company} | {location} | {posted_date}
+    [link]({url})
+
+    Matched: {matched_keyword} on {site}
+
 # Drop jobs older than this many hours. Comment out / remove for no filter.
 # Per-site override available under sites.<name>.max_age_hours.
 # Pair this value with the URL templates below: jobstreet/indeed take a "1"
