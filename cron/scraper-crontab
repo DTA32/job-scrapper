@@ -1,0 +1,1 @@
+0 1 * * * /bin/sh /workspace/scraper-bot/cron/run-scraper.sh

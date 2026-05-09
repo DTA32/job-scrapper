@@ -95,6 +95,7 @@ writes, and keeps a timestamped backup. See [`docs/mcp.md`](docs/mcp.md).
 - [`docs/filters.md`](docs/filters.md) — content filter reference
 - [`docs/sites.md`](docs/sites.md) — per-site coverage and quirks
 - [`docs/architecture.md`](docs/architecture.md) — package map and request flow
+- [`docs/orchestration.md`](docs/orchestration.md) — cron + Claude + Discord automated flow
 
 ## Project layout
 
