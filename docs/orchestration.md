@@ -119,22 +119,50 @@ The bot container lives in your personal-bots compose on the VPS.
    docker compose logs -f scraper-bot
    ```
 
-## Schedule
+## Bot config block
 
-Edit `cron/scraper-crontab`:
+All bot-tunable settings live under the `bot:` block in `config.yaml`:
 
+```yaml
+bot:
+  schedule: "0 1 * * *"          # supercronic cron expression
+  max_chars: 1900                # per-message Discord cap (Discord limit is 2000)
+  message_template: |            # per-job message template; supports {field}
+    ## {title}
+    {company} | {location} | {posted_date}
+    [link]({url})
+
+    Matched: {matched_keyword} on {site}
 ```
-0 */6 * * * /bin/sh /workspace/scraper-bot/cron/run-scraper.sh   # every 6h
-0 1 * * *   /bin/sh /workspace/scraper-bot/cron/run-scraper.sh   # daily 01:00 (default)
-*/30 * * * * /bin/sh /workspace/scraper-bot/cron/run-scraper.sh  # every 30 min
-@every 1h    /bin/sh /workspace/scraper-bot/cron/run-scraper.sh  # supercronic shorthand
+
+| Setting | When it's read | Effect |
+|---|---|---|
+| `bot.schedule` | Bot image build time (yq → crontab) | Cron cadence supercronic uses |
+| `bot.max_chars` | Each prompt run (Claude reads via yq) | Truncates messages above this length |
+| `bot.message_template` | Each prompt run | Format applied to every job |
+
+Schedule examples (standard cron + supercronic shorthand):
+
+```yaml
+schedule: "0 10 * * *"       # daily 10:00 (default; Asia/Jakarta timezone)
+schedule: "0 */6 * * *"      # every 6h
+schedule: "*/30 * * * *"     # every 30 min
+schedule: "@every 1h"        # supercronic shorthand
 ```
 
-Restart after editing:
+The schedule is evaluated against the bot container's clock. The deploy
+workflow injects `TZ=Asia/Jakarta` by default — override by setting a
+`TZ` GitHub repo variable (e.g. `Asia/Singapore`, `Etc/UTC`).
 
-```bash
-docker compose restart scraper-bot
-```
+Template placeholders match canonical Job field names — use any of:
+`title`, `company`, `url`, `location`, `salary`, `posted_date`,
+`posted_at`, `work_type`, `employment_type`, `experience_level`,
+`job_id`, `matched_keyword`, `site`. Lines whose placeholder resolves
+to null get dropped.
+
+Edit → commit → push to main → deploy rebuilds the bot image (for
+schedule) and the next run picks up template/max_chars changes
+without further work.
 
 ## Discord posting
 

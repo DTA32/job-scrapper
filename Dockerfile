@@ -54,23 +54,31 @@ CMD []
 FROM node:20-slim AS bot
 
 ARG SUPERCRONIC_URL=https://github.com/aptible/supercronic/releases/latest/download/supercronic-linux-amd64
+ARG YQ_URL=https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
 
 RUN apt-get update \
- && apt-get install -y --no-install-recommends curl ca-certificates \
+ && apt-get install -y --no-install-recommends curl ca-certificates tzdata \
  && rm -rf /var/lib/apt/lists/*
 
 RUN curl -fsSL "$SUPERCRONIC_URL" -o /usr/local/bin/supercronic \
- && chmod +x /usr/local/bin/supercronic
+ && chmod +x /usr/local/bin/supercronic \
+ && curl -fsSL "$YQ_URL" -o /usr/local/bin/yq \
+ && chmod +x /usr/local/bin/yq
 
 RUN npm install -g @anthropic-ai/claude-code
 
 WORKDIR /workspace/scraper-bot
 
+COPY --chown=node:node config.yaml /workspace/config.yaml
 COPY --chown=node:node cron ./cron
 COPY --chown=node:node prompts ./prompts
 COPY --chown=node:node claude/mcp.json.example ./.mcp.json
 
-RUN chmod +x cron/entrypoint.sh cron/run-scraper.sh \
+RUN SCHEDULE="$(yq -r '.bot.schedule // "0 1 * * *"' /workspace/config.yaml)" \
+ && echo "Generated cron schedule: $SCHEDULE" \
+ && printf '%s /bin/sh /workspace/scraper-bot/cron/run-scraper.sh\n' "$SCHEDULE" \
+    > cron/scraper-crontab \
+ && chmod +x cron/entrypoint.sh cron/run-scraper.sh \
  && mkdir -p /home/node/.claude \
  && touch /home/node/.claude.json \
  && chown -R node:node /home/node /workspace

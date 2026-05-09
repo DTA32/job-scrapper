@@ -120,7 +120,7 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          envs: IMAGE_TAG,CONTAINER_NAME,CLAUDE_CONFIG_DIR,CLAUDE_CONFIG_FILE,DISCORD_BOT_TOKEN,DISCORD_CHANNEL_ID
+          envs: IMAGE_TAG,CONTAINER_NAME,CLAUDE_CONFIG_DIR,CLAUDE_CONFIG_FILE,DISCORD_BOT_TOKEN,DISCORD_CHANNEL_ID,TZ
           script: |
             set -euo pipefail
             docker pull "$IMAGE_TAG"
@@ -134,6 +134,7 @@ jobs:
               -v "$CLAUDE_CONFIG_FILE:/home/node/.claude.json" \
               -e DISCORD_BOT_TOKEN="$DISCORD_BOT_TOKEN" \
               -e DISCORD_CHANNEL_ID="$DISCORD_CHANNEL_ID" \
+              -e TZ="$TZ" \
               "$IMAGE_TAG"
             docker ps --filter "name=$CONTAINER_NAME"
         env:
@@ -143,3 +144,4 @@ jobs:
           CLAUDE_CONFIG_FILE: ${{ vars.CLAUDE_CONFIG_FILE }}
           DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
           DISCORD_CHANNEL_ID: ${{ secrets.DISCORD_CHANNEL_ID }}
+          TZ: ${{ vars.TZ || 'Asia/Jakarta' }}
