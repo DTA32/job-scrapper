@@ -3,6 +3,10 @@ limit: 2
 concurrency: 2
 output_dir: output
 
+# Drop jobs older than this many hours. Comment out / remove for no filter.
+# Per-site override available under sites.<name>.max_age_hours.
+max_age_hours: 720
+
 # Fields included by default for every site (canonical names).
 # Allowed: title, company, url, location, salary, posted_date,
 # work_type, employment_type, experience_level, job_id.
