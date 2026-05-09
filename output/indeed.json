@@ -1,0 +1,20 @@
+{
+  "keyword": "software engineer",
+  "count": 2,
+  "jobs": [
+    {
+      "site": "indeed",
+      "title": "Software Engineer Kompas.com",
+      "company": "Kompas Gramedia",
+      "location": "Jakarta",
+      "url": "https://id.indeed.com/viewjob?jk=b973117f62d67d7c"
+    },
+    {
+      "site": "indeed",
+      "title": "Software Engineer",
+      "company": "SEVIMA",
+      "location": "Surabaya",
+      "url": "https://id.indeed.com/viewjob?jk=6be2a36726ce6095"
+    }
+  ]
+}
