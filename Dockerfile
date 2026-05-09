@@ -49,3 +49,33 @@ EXPOSE 8080
 
 ENTRYPOINT ["python", "-m", "mcp_server.server"]
 CMD []
+
+
+FROM node:20-slim AS bot
+
+ARG SUPERCRONIC_URL=https://github.com/aptible/supercronic/releases/latest/download/supercronic-linux-amd64
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends curl ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+
+RUN curl -fsSL "$SUPERCRONIC_URL" -o /usr/local/bin/supercronic \
+ && chmod +x /usr/local/bin/supercronic
+
+RUN npm install -g @anthropic-ai/claude-code
+
+WORKDIR /workspace/scraper-bot
+
+COPY --chown=node:node cron ./cron
+COPY --chown=node:node prompts ./prompts
+COPY --chown=node:node claude/mcp.json.example ./.mcp.json
+
+RUN chmod +x cron/entrypoint.sh cron/run-scraper.sh \
+ && mkdir -p /home/node/.claude \
+ && touch /home/node/.claude.json \
+ && chown -R node:node /home/node /workspace
+
+USER node
+
+ENTRYPOINT ["/usr/local/bin/supercronic"]
+CMD ["/workspace/scraper-bot/cron/scraper-crontab"]

@@ -78,9 +78,10 @@ The bot container lives in your personal-bots compose on the VPS.
        restart: unless-stopped
        shm_size: ${SHM_SIZE}
        entrypoint: ["/bin/sh", "/workspace/scraper-bot/cron/entrypoint.sh"]
-       depends_on: [scraper-mcp]
        environment:
          - DISCORD_CHANNEL_ID=${DISCORD_CHANNEL_ID}
+       extra_hosts:
+         - "host.docker.internal:host-gateway"
        volumes:
          - ${CLAUDE_CONFIG_DIR}:/home/node/.claude
          - ${CLAUDE_CONFIG_FILE}:/home/node/.claude.json
@@ -159,7 +160,14 @@ is picked up.
 The scraper-bot container has `claude/.mcp.json` accessible at the
 project root inside the workspace. When `claude -p` runs from
 `/workspace/scraper-bot/`, it picks up `.mcp.json` and registers the
-`job-scraper` MCP server pointing at `http://scraper-mcp:8080/mcp`.
+`job-scraper` MCP server.
+
+The default URL is `http://host.docker.internal:8080/mcp` — the
+scraper-mcp container is deployed standalone (see `docs/deploy.md`)
+and listens on the VPS's host port `8080`. The `extra_hosts:
+"host.docker.internal:host-gateway"` line in the bot's compose service
+maps that name to the Docker bridge gateway so the bot can reach the
+host's published port from inside the container.
 
 If you'd rather register globally (so all your Claude containers see it),
 add the entry to `${CLAUDE_CONFIG_FILE}` (the `.claude.json` you mount).
@@ -170,7 +178,7 @@ add the entry to `${CLAUDE_CONFIG_FILE}` (the `.claude.json` you mount).
 |---|---|---|
 | Container restarts on healthcheck failure | supercronic process not running | Check `cron/scraper.log` for crontab parse errors |
 | Cron fires but Claude exits with `mcp not found` | `.mcp.json` not in scope | Verify `claude -p` is run with cwd = workspace dir; or add to global `.claude.json` |
-| Claude logs `connection refused: scraper-mcp:8080` | scraper-mcp not running or different network | `docker network inspect <net>` and confirm both containers are on it |
+| Claude logs `connection refused: host.docker.internal:8080` | scraper-mcp not running, or `extra_hosts` missing from bot compose | `docker ps` to confirm scraper-mcp is up on host port 8080; verify `extra_hosts: ["host.docker.internal:host-gateway"]` is in the bot service |
 | Discord post fails with 401 | Bot token not saved at `/home/node/.claude/channels/discord/.env` | Re-run `/discord:configure <token>` on the user's host Claude session |
 | Discord post fails with 403 | Bot lacks send-messages perm in channel | Re-invite bot with the right OAuth scopes |
 | Cron never fires | Bad crontab syntax | `docker exec scraper-bot /workspace/scraper-bot/cron/supercronic -test /workspace/scraper-bot/cron/scraper-crontab` |
