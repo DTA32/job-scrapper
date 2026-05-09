@@ -173,17 +173,25 @@ To roll back manually: `mv config.yaml.bak.<ts> config.yaml`.
 #### Required permissions
 
 The MCP server's bind mount must be **read-write** for `update_config` to
-succeed. In the orchestration compose file:
+succeed. Recommended compose for the MCP service:
 
 ```yaml
 services:
   scraper-mcp:
     volumes:
       - ./config.yaml:/app/config.yaml         # rw — drop ":ro" to allow writes
-      - ./output:/app/output
+      - ./output:/app/output                   # rw — runtime output
+      - ./docs:/app/docs:ro                    # ro — bundled markdown references
 ```
 
-If the mount is read-only, `update_config` returns `{ok: false, error: "write failed: ..."}`.
+If the config mount is read-only, `update_config` returns
+`{ok: false, error: "write failed: ..."}`.
+
+The `docs:/app/docs:ro` mount makes the markdown reference docs (this file,
+`runbook.md`, `configuration.md`, `sites.md`, etc.) live-readable from inside
+the container. Edit any doc on the host and the next read inside the
+container sees it — no rebuild needed. Drop the mount for production
+deployments where docs aren't expected to change at runtime.
 
 ### `scrape_jobs`
 
