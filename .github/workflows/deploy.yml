@@ -100,6 +100,13 @@ jobs:
             docker pull "$IMAGE_TAG"
             docker stop "$CONTAINER_NAME" || true
             docker rm "$CONTAINER_NAME" || true
+
+            STALE=$(docker ps --filter "publish=8080" --format "{{.ID}}")
+            if [ -n "$STALE" ]; then
+              echo "Removing stale container(s) on port 8080: $STALE"
+              echo "$STALE" | xargs -r docker rm -f
+            fi
+
             docker run -d \
               --name "$CONTAINER_NAME" \
               --restart unless-stopped \
