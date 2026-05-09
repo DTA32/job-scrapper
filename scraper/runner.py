@@ -175,6 +175,12 @@ def run(
         url = site_cfg.url_for(keyword)
         scraper = scraper_cls(url=url, limit=config.limit)
         keyword_dir = out / keyword_slug(keyword)
+        if not keyword_dir.resolve().is_relative_to(out):
+            print(
+                f"[runner] keyword '{keyword}' slug escapes output_dir; skipping",
+                file=sys.stderr,
+            )
+            return
         run_one(
             scraper,
             fetcher,
