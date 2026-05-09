@@ -23,6 +23,14 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         help="path to YAML config (default: ./config.yaml)",
     )
     parser.add_argument(
+        "-k",
+        "--keyword",
+        action="append",
+        dest="keywords",
+        default=None,
+        help="override keyword(s) from config; pass --keyword multiple times for several",
+    )
+    parser.add_argument(
         "sites",
         nargs="*",
         help="optional site names to run; overrides 'enabled' flags in config",
@@ -37,7 +45,7 @@ def main(argv: list[str] | None = None) -> int:
     except ConfigError as exc:
         print(f"[config] {exc}", file=sys.stderr)
         return 2
-    return run(config, targets=args.sites)
+    return run(config, targets=args.sites, keywords=args.keywords)
 
 
 if __name__ == "__main__":
