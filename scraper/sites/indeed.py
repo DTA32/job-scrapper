@@ -2,17 +2,12 @@ from __future__ import annotations
 
 from bs4 import BeautifulSoup
 
-from ..config import LIMIT
 from ..types import Job
 from .base import Scraper
 
 
 class IndeedScraper(Scraper):
     name = "indeed"
-    url = (
-        "https://id.indeed.com/jobs"
-        "?q=software+engineer&l=Indonesia"
-    )
 
     def parse(self, html: str) -> list[Job]:
         soup = BeautifulSoup(html, "lxml")
@@ -85,6 +80,6 @@ class IndeedScraper(Scraper):
                     url=url,
                 )
             )
-            if len(results) >= LIMIT:
+            if len(results) >= self.limit:
                 break
         return results

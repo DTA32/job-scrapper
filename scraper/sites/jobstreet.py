@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from bs4 import BeautifulSoup
 
-from ..config import LIMIT
 from ..types import Job
 from ._next_data import extract_next_data, walk_dicts
 from .base import Scraper
@@ -38,15 +37,14 @@ def _location_from_candidate(candidate: dict) -> str | None:
 
 class JobstreetScraper(Scraper):
     name = "jobstreet"
-    url = "https://id.jobstreet.com/id/software-engineer-jobs"
 
     def parse(self, html: str) -> list[Job]:
         results: list[Job] = []
         results.extend(self._parse_next_data(html))
-        if len(results) >= LIMIT:
-            return results[:LIMIT]
+        if len(results) >= self.limit:
+            return results[: self.limit]
         results.extend(self._parse_html(html, skip=len(results)))
-        return results[:LIMIT]
+        return results[: self.limit]
 
     def _parse_next_data(self, html: str) -> list[Job]:
         data = extract_next_data(html)
@@ -81,7 +79,7 @@ class JobstreetScraper(Scraper):
                     url=f"https://id.jobstreet.com/id/job/{job_id}" if job_id else None,
                 )
             )
-            if len(results) >= LIMIT:
+            if len(results) >= self.limit:
                 break
         return results
 
@@ -115,6 +113,6 @@ class JobstreetScraper(Scraper):
                         url=url,
                     )
                 )
-                if len(results) + skip >= LIMIT:
+                if len(results) + skip >= self.limit:
                     break
         return results

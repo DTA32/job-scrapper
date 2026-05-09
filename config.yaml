@@ -1,0 +1,20 @@
+keyword: software engineer
+limit: 2
+output_dir: output
+
+sites:
+  jobstreet:
+    enabled: true
+    url_template: "https://id.jobstreet.com/id/{keyword_slug}-jobs"
+
+  glints:
+    enabled: true
+    url_template: "https://glints.com/id/opportunities/jobs/explore?keyword={keyword}&country=ID"
+
+  linkedin:
+    enabled: true
+    url_template: "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords={keyword}&location=Indonesia&start=0"
+
+  indeed:
+    enabled: true
+    url_template: "https://id.indeed.com/jobs?q={keyword_plus}&l=Indonesia"
