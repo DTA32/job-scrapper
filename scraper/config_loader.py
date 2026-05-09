@@ -22,6 +22,7 @@ class SiteConfig:
 class AppConfig:
     keyword: str
     limit: int
+    concurrency: int
     output_dir: Path
     sites: tuple[SiteConfig, ...]
 
@@ -90,11 +91,22 @@ def load(path: Path) -> AppConfig:
     if limit < 1:
         raise ConfigError(f"'limit' must be >= 1, got {limit}")
 
+    concurrency_raw = raw.get("concurrency", 2)
+    try:
+        concurrency = int(concurrency_raw)
+    except (TypeError, ValueError) as exc:
+        raise ConfigError(
+            f"'concurrency' must be an integer, got {concurrency_raw!r}"
+        ) from exc
+    if concurrency < 1:
+        raise ConfigError(f"'concurrency' must be >= 1, got {concurrency}")
+
     output_dir = Path(str(raw.get("output_dir", "output")))
 
     return AppConfig(
         keyword=keyword.strip(),
         limit=limit,
+        concurrency=concurrency,
         output_dir=output_dir,
         sites=tuple(sites),
     )
