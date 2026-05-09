@@ -7,5 +7,46 @@ class Job(TypedDict):
     site: str
     title: str
     company: str
-    location: str | None
     url: str | None
+    location: str | None
+    salary: str | None
+    posted_date: str | None
+    work_type: str | None
+    employment_type: str | None
+    experience_level: str | None
+    job_id: str | None
+
+
+CANONICAL_FIELDS: frozenset[str] = frozenset(
+    {
+        "site",
+        "title",
+        "company",
+        "url",
+        "location",
+        "salary",
+        "posted_date",
+        "work_type",
+        "employment_type",
+        "experience_level",
+        "job_id",
+    }
+)
+
+MANDATORY_FIELDS: frozenset[str] = frozenset({"site", "title", "company", "url"})
+
+
+def empty_job(site: str, title: str, company: str) -> Job:
+    return Job(
+        site=site,
+        title=title,
+        company=company,
+        url=None,
+        location=None,
+        salary=None,
+        posted_date=None,
+        work_type=None,
+        employment_type=None,
+        experience_level=None,
+        job_id=None,
+    )
