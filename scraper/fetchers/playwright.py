@@ -4,17 +4,22 @@ import sys
 import time
 
 from ..config import USER_AGENT
+from .base import FetchAttempt, detect_challenge
 
 
 class PlaywrightFetcher:
     name = "playwright"
 
-    def fetch(self, url: str) -> str | None:
+    def fetch(self, url: str) -> tuple[str | None, FetchAttempt]:
         try:
             from playwright.sync_api import sync_playwright
         except Exception as exc:
             print(f"[playwright] not installed: {exc}", file=sys.stderr)
-            return None
+            return None, FetchAttempt(
+                fetcher=self.name,
+                code="not_installed",
+                detail=f"{type(exc).__name__}: {exc}",
+            )
 
         stealth_v2 = None
         stealth_sync = None
@@ -57,7 +62,34 @@ class PlaywrightFetcher:
                 html = page.content()
                 context.close()
                 browser.close()
-                return html
         except Exception as exc:
             print(f"[playwright] error on {url}: {exc}", file=sys.stderr)
-            return None
+            msg = str(exc)
+            lowered = msg.lower()
+            if "asyncio" in lowered and "loop" in lowered:
+                return None, FetchAttempt(
+                    fetcher=self.name,
+                    code="runtime_error",
+                    detail="asyncio sync-API conflict",
+                )
+            if "timeout" in lowered:
+                return None, FetchAttempt(
+                    fetcher=self.name,
+                    code="timeout",
+                    detail=msg[:200],
+                )
+            return None, FetchAttempt(
+                fetcher=self.name,
+                code="runtime_error",
+                detail=f"{type(exc).__name__}: {msg[:200]}",
+            )
+
+        challenge = detect_challenge(html)
+        if challenge:
+            print(f"[playwright] {url} blocked by challenge page", file=sys.stderr)
+            return None, FetchAttempt(
+                fetcher=self.name,
+                code="challenge",
+                detail=challenge,
+            )
+        return html, FetchAttempt(fetcher=self.name, code="ok")

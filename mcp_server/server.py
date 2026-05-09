@@ -197,10 +197,17 @@ def scrape_jobs(
                 for that site and stamped with `matched_keyword`. Canonical
                 fields: site, matched_keyword, title, company, url, location,
                 salary, posted_date, posted_at, work_type, employment_type,
-                experience_level, job_id. Fields a site cannot extract are
-                returned as null.
-            errors: list of {keyword, site, reason} for any pair that failed.
-                Presence of entries here means ok=false.
+                experience_level, job_id, requirements. Fields a site cannot
+                extract are returned as null.
+            errors: list of {keyword, site, reason, attempts?} for any pair
+                that failed. Presence of entries here means ok=false.
+                `attempts` (when present) lists per-fetcher outcomes:
+                [{fetcher, code, detail}]. Codes:
+                  - http_<status>     site rejected request (e.g. http_403)
+                  - challenge         anti-bot wall (detail = matched title/marker)
+                  - timeout           network or page-load timeout
+                  - runtime_error     unexpected exception (detail = class+msg)
+                  - not_installed     fetcher dependency missing
     """
     try:
         config = _load_config(DEFAULT_CONFIG_PATH)
@@ -230,13 +237,15 @@ def scrape_jobs(
                 )
                 continue
             if isinstance(payload, dict) and "error" in payload:
-                errors.append(
-                    {
-                        "keyword": keyword,
-                        "site": name,
-                        "reason": str(payload.get("error")),
-                    }
-                )
+                err: dict[str, Any] = {
+                    "keyword": keyword,
+                    "site": name,
+                    "reason": str(payload.get("error")),
+                }
+                attempts = payload.get("attempts")
+                if isinstance(attempts, list):
+                    err["attempts"] = attempts
+                errors.append(err)
                 continue
             per_site.append({"site": name, **payload})
         results.append({"keyword": keyword, "sites": per_site})
