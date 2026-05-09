@@ -59,11 +59,15 @@ def _posted_date_from_candidate(candidate: dict) -> str | None:
     return None
 
 
+def _normalize(value: str) -> str:
+    return value.strip().lower().replace("_", "-")
+
+
 def _work_type_from_candidate(candidate: dict) -> str | None:
     for key in ("workArrangementOption", "workType", "remoteType"):
         value = candidate.get(key)
         if isinstance(value, str) and value:
-            return value.lower()
+            return _normalize(value)
     return None
 
 
@@ -71,7 +75,7 @@ def _employment_type_from_candidate(candidate: dict) -> str | None:
     for key in ("jobType", "type", "employmentType"):
         value = candidate.get(key)
         if isinstance(value, str) and value:
-            return value.lower()
+            return _normalize(value)
     return None
 
 
@@ -79,7 +83,7 @@ def _experience_level_from_candidate(candidate: dict) -> str | None:
     for key in ("seniorityLevel", "experienceLevel", "experience"):
         value = candidate.get(key)
         if isinstance(value, str) and value:
-            return value.lower()
+            return _normalize(value)
     if isinstance(candidate.get("minYearsOfExperience"), (int, float)):
         years = int(candidate["minYearsOfExperience"])
         return f"{years}+ years"
