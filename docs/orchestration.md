@@ -79,6 +79,8 @@ The bot container lives in your personal-bots compose on the VPS.
        shm_size: ${SHM_SIZE}
        entrypoint: ["/bin/sh", "/workspace/scraper-bot/cron/entrypoint.sh"]
        depends_on: [scraper-mcp]
+       environment:
+         - DISCORD_CHANNEL_ID=${DISCORD_CHANNEL_ID}
        volumes:
          - ${CLAUDE_CONFIG_DIR}:/home/node/.claude
          - ${CLAUDE_CONFIG_FILE}:/home/node/.claude.json
@@ -97,12 +99,17 @@ The bot container lives in your personal-bots compose on the VPS.
    CLAUDE_CONFIG_DIR=/home/ubuntu/.claude
    CLAUDE_CONFIG_FILE=/home/ubuntu/.claude.json
    WORKSPACE_DIR=/home/ubuntu/bots/personal-bots
+   DISCORD_CHANNEL_ID=1330393101084266609
    SHM_SIZE=2gb
    HC_INTERVAL=30s
    HC_TIMEOUT=10s
    HC_RETRIES=3
    HC_START_PERIOD=60s
    ```
+
+   And pass `DISCORD_CHANNEL_ID` into the bot container by adding it to
+   the `environment:` block of the scraper-bot service (or by using
+   compose's automatic env file expansion).
 
 5. **Bring it up**:
    ```bash
@@ -134,14 +141,14 @@ The prompt instructs Claude to:
 
 1. Read the bot token from `/home/node/.claude/channels/discord/.env`
    (saved there by `/discord:configure` during pairing)
-2. POST each job as a separate message to channel `1330393101084266609`
-   (hardcoded in `prompts/scrape-and-post.md` — same channel as your
-   legacy LinkedIn scraper)
+2. POST each job as a separate message to the channel ID supplied by the
+   `DISCORD_CHANNEL_ID` environment variable (set in the bot container's
+   env via your `personal-bots/.env`)
 3. Use Node's `https` module via `node -e` to keep token in env vars,
    never inlined in shell
 
-To change the Discord channel, edit the channel ID in
-`prompts/scrape-and-post.md`.
+To change the Discord channel, set `DISCORD_CHANNEL_ID` in your
+`personal-bots/.env` and restart the bot container.
 
 To change the bot, re-pair via `/discord:configure` and restart the bot
 container so the new token in `/home/node/.claude/channels/discord/.env`

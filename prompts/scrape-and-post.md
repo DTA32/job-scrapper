@@ -55,20 +55,23 @@ If the per-site result has `count: 0`, skip silently (don't post a
 
 Read the bot token from `/home/node/.claude/channels/discord/.env`.
 
-Send each job as a **separate message** to Discord channel
-`1330393101084266609`. One API call per job. Loop through all jobs and
-send individually via `node` — export `BOT_TOKEN` and `MSG` as env vars,
-never inline:
+Read the destination channel ID from the env var `DISCORD_CHANNEL_ID`
+(provided by the bot container's environment).
+
+Send each job as a **separate message** to that channel. One API call
+per job. Loop through all jobs and send individually via `node` —
+export `BOT_TOKEN`, `CHANNEL_ID`, and `MSG` as env vars, never inline:
 
 ```sh
 export BOT_TOKEN=<token>
+export CHANNEL_ID=$DISCORD_CHANNEL_ID
 export MSG=<formatted message for one job>
 node -e "
 const https = require('https');
 const body = JSON.stringify({content: process.env.MSG});
 const req = https.request({
   hostname: 'discord.com',
-  path: '/api/v10/channels/1330393101084266609/messages',
+  path: '/api/v10/channels/' + process.env.CHANNEL_ID + '/messages',
   method: 'POST',
   headers: {
     'Authorization': 'Bot ' + process.env.BOT_TOKEN,
