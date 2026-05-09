@@ -3,7 +3,7 @@ from __future__ import annotations
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 
 import yaml
 
@@ -14,6 +14,18 @@ DEFAULT_FIELDS: tuple[str, ...] = ("title", "company", "location", "url")
 FILTERABLE_FIELDS: frozenset[str] = frozenset(
     {"location", "employment_type", "work_type"}
 )
+
+ALLOWED_URL_HOSTS: frozenset[str] = frozenset({
+    "id.jobstreet.com",
+    "jobstreet.com",
+    "glints.com",
+    "id.glints.com",
+    "www.linkedin.com",
+    "linkedin.com",
+    "id.indeed.com",
+    "indeed.com",
+    "www.indeed.com",
+})
 
 
 class ConfigError(ValueError):
@@ -83,7 +95,30 @@ class AppConfig:
 
 
 def _slugify(keyword: str) -> str:
-    return keyword.strip().lower().replace(" ", "-")
+    safe = keyword.strip().replace("/", "-").replace("\\", "-")
+    while ".." in safe:
+        safe = safe.replace("..", ".")
+    return safe.lower().replace(" ", "-")
+
+
+def _validate_url_host(site_name: str, template: str) -> None:
+    parsed = urlparse(template)
+    if parsed.scheme not in ("http", "https"):
+        raise ConfigError(
+            f"site '{site_name}' url_template scheme must be http or https, "
+            f"got '{parsed.scheme}'"
+        )
+    host = (parsed.hostname or "").lower()
+    if "{" in host or "}" in host:
+        raise ConfigError(
+            f"site '{site_name}' url_template hostname must be a fixed domain, "
+            f"not a placeholder"
+        )
+    if host not in ALLOWED_URL_HOSTS:
+        raise ConfigError(
+            f"site '{site_name}' url_template has disallowed host '{host}'; "
+            f"allowed: {sorted(ALLOWED_URL_HOSTS)}"
+        )
 
 
 def _build_template_vars(keyword: str) -> dict[str, str]:
@@ -239,6 +274,7 @@ def load(path: Path) -> AppConfig:
         template = cfg.get("url_template")
         if not isinstance(template, str) or not template:
             raise ConfigError(f"site '{name}' must define non-empty 'url_template'")
+        _validate_url_host(name, template)
         _resolve_url(name, template, sample_vars)
         enabled = bool(cfg.get("enabled", True))
 
