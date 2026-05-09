@@ -7,7 +7,10 @@ from ..types import Job
 
 class Scraper(ABC):
     name: str
-    url: str
+
+    def __init__(self, url: str, limit: int) -> None:
+        self.url = url
+        self.limit = limit
 
     @abstractmethod
     def parse(self, html: str) -> list[Job]: ...

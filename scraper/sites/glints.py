@@ -4,7 +4,6 @@ import re
 
 from bs4 import BeautifulSoup
 
-from ..config import LIMIT
 from ..types import Job
 from ._next_data import extract_next_data, walk_dicts
 from .base import Scraper
@@ -37,18 +36,14 @@ def _location_from_candidate(candidate: dict) -> str | None:
 
 class GlintsScraper(Scraper):
     name = "glints"
-    url = (
-        "https://glints.com/id/opportunities/jobs/explore"
-        "?keyword=software%20engineer&country=ID"
-    )
 
     def parse(self, html: str) -> list[Job]:
         results: list[Job] = []
         results.extend(self._parse_next_data(html))
-        if len(results) >= LIMIT:
-            return results[:LIMIT]
+        if len(results) >= self.limit:
+            return results[: self.limit]
         results.extend(self._parse_html(html, skip=len(results)))
-        return results[:LIMIT]
+        return results[: self.limit]
 
     def _parse_next_data(self, html: str) -> list[Job]:
         data = extract_next_data(html)
@@ -82,7 +77,7 @@ class GlintsScraper(Scraper):
                     url=f"https://glints.com/id/opportunities/jobs/{slug}" if slug else None,
                 )
             )
-            if len(results) >= LIMIT:
+            if len(results) >= self.limit:
                 break
         return results
 
@@ -123,6 +118,6 @@ class GlintsScraper(Scraper):
                         url=url,
                     )
                 )
-                if len(results) + skip >= LIMIT:
+                if len(results) + skip >= self.limit:
                     break
         return results

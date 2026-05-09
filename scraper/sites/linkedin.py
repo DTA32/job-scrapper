@@ -2,17 +2,12 @@ from __future__ import annotations
 
 from bs4 import BeautifulSoup
 
-from ..config import LIMIT
 from ..types import Job
 from .base import Scraper
 
 
 class LinkedinScraper(Scraper):
     name = "linkedin"
-    url = (
-        "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search"
-        "?keywords=software%20engineer&location=Indonesia&start=0"
-    )
 
     def parse(self, html: str) -> list[Job]:
         soup = BeautifulSoup(html, "lxml")
@@ -47,6 +42,6 @@ class LinkedinScraper(Scraper):
                         url=url,
                     )
                 )
-                if len(results) >= LIMIT:
+                if len(results) >= self.limit:
                     break
         return results

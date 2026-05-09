@@ -5,18 +5,21 @@ import sys
 from pathlib import Path
 from typing import Iterable
 
-from .config import KEYWORD
+from .config_loader import AppConfig
 from .fetchers import CloudscraperFetcher, FetchChain, PlaywrightFetcher
 from .sites import SCRAPERS, Scraper
-
-OUTPUT_DIR = Path(__file__).resolve().parent.parent / "output"
 
 
 def default_fetch_chain() -> FetchChain:
     return FetchChain([CloudscraperFetcher(), PlaywrightFetcher()])
 
 
-def run_one(scraper: Scraper, fetcher: FetchChain, output_dir: Path) -> None:
+def run_one(
+    scraper: Scraper,
+    fetcher: FetchChain,
+    output_dir: Path,
+    keyword: str,
+) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     json_path = output_dir / f"{scraper.name}.json"
     debug_path = output_dir / f"{scraper.name}.debug.html"
@@ -39,17 +42,38 @@ def run_one(scraper: Scraper, fetcher: FetchChain, output_dir: Path) -> None:
     print(f"[{scraper.name}] parsed {len(jobs)} job(s)")
     json_path.write_text(
         json.dumps(
-            {"keyword": KEYWORD, "count": len(jobs), "jobs": jobs},
+            {"keyword": keyword, "count": len(jobs), "jobs": jobs},
             indent=2,
         )
     )
     print(f"[{scraper.name}] wrote {json_path.name}")
 
 
-def run(targets: Iterable[str], output_dir: Path | None = None) -> int:
-    out = output_dir or OUTPUT_DIR
-    fetcher = default_fetch_chain()
-    unknown = [name for name in targets if name not in SCRAPERS]
+def _select_targets(config: AppConfig, requested: Iterable[str]) -> list[str]:
+    requested_list = list(requested)
+    if requested_list:
+        return requested_list
+    return list(config.enabled_site_names())
+
+
+def run(
+    config: AppConfig,
+    targets: Iterable[str] = (),
+    output_dir: Path | None = None,
+) -> int:
+    out = output_dir or config.output_dir
+    if not out.is_absolute():
+        out = (Path.cwd() / out).resolve()
+
+    selected = _select_targets(config, targets)
+    if not selected:
+        print(
+            "[runner] no sites selected (none enabled in config and no CLI args)",
+            file=sys.stderr,
+        )
+        return 1
+
+    unknown = [name for name in selected if name not in SCRAPERS]
     if unknown:
         print(
             f"[runner] unknown sites: {', '.join(unknown)}. "
@@ -57,6 +81,17 @@ def run(targets: Iterable[str], output_dir: Path | None = None) -> int:
             file=sys.stderr,
         )
         return 1
-    for name in targets:
-        run_one(SCRAPERS[name](), fetcher, out)
+
+    fetcher = default_fetch_chain()
+    for name in selected:
+        site_cfg = config.site(name)
+        if site_cfg is None:
+            print(
+                f"[runner] '{name}' has no entry in config.yaml; skipping",
+                file=sys.stderr,
+            )
+            continue
+        scraper_cls = SCRAPERS[name]
+        scraper = scraper_cls(url=site_cfg.url, limit=config.limit)
+        run_one(scraper, fetcher, out, config.keyword)
     return 0
