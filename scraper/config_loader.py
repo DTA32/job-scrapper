@@ -22,6 +22,7 @@ class SiteConfig:
     enabled: bool
     url: str
     fields: tuple[str, ...] | None = None
+    max_age_hours: int | None = None
 
     def effective_fields(self, default: tuple[str, ...]) -> tuple[str, ...]:
         return self.fields if self.fields is not None else default
@@ -34,6 +35,7 @@ class AppConfig:
     concurrency: int
     output_dir: Path
     default_fields: tuple[str, ...]
+    max_age_hours: int | None
     sites: tuple[SiteConfig, ...]
 
     def site(self, name: str) -> SiteConfig | None:
@@ -54,6 +56,12 @@ class AppConfig:
         )
         return MANDATORY_FIELDS | frozenset(configured)
 
+    def max_age_for(self, site_name: str) -> int | None:
+        cfg = self.site(site_name)
+        if cfg is not None and cfg.max_age_hours is not None:
+            return cfg.max_age_hours
+        return self.max_age_hours
+
 
 def _build_template_vars(keyword: str) -> dict[str, str]:
     stripped = keyword.strip()
@@ -72,6 +80,24 @@ def _resolve_url(site_name: str, template: str, vars_: dict[str, str]) -> str:
             f"site '{site_name}' url_template uses unknown placeholder {exc}; "
             f"allowed: {sorted(vars_)}"
         ) from exc
+
+
+def _parse_max_age(raw: object, source: str) -> int | None:
+    if raw is None:
+        return None
+    if isinstance(raw, bool) or not isinstance(raw, (int, float, str)):
+        raise ConfigError(
+            f"{source} must be a positive integer or null, got {raw!r}"
+        )
+    try:
+        value = int(raw)
+    except (TypeError, ValueError) as exc:
+        raise ConfigError(
+            f"{source} must be a positive integer or null, got {raw!r}"
+        ) from exc
+    if value < 1:
+        raise ConfigError(f"{source} must be >= 1, got {value}")
+    return value
 
 
 def _validate_fields(raw: object, source: str) -> tuple[str, ...]:
@@ -131,8 +157,16 @@ def load(path: Path) -> AppConfig:
         if "fields" in cfg:
             site_fields = _validate_fields(cfg["fields"], f"sites.{name}.fields")
 
+        site_max_age = _parse_max_age(cfg.get("max_age_hours"), f"sites.{name}.max_age_hours")
+
         sites.append(
-            SiteConfig(name=name, enabled=enabled, url=url, fields=site_fields)
+            SiteConfig(
+                name=name,
+                enabled=enabled,
+                url=url,
+                fields=site_fields,
+                max_age_hours=site_max_age,
+            )
         )
 
     limit_raw = raw.get("limit", 2)
@@ -155,11 +189,14 @@ def load(path: Path) -> AppConfig:
 
     output_dir = Path(str(raw.get("output_dir", "output")))
 
+    max_age_hours = _parse_max_age(raw.get("max_age_hours"), "max_age_hours")
+
     return AppConfig(
         keyword=keyword.strip(),
         limit=limit,
         concurrency=concurrency,
         output_dir=output_dir,
         default_fields=default_fields,
+        max_age_hours=max_age_hours,
         sites=tuple(sites),
     )

@@ -3,17 +3,41 @@ from __future__ import annotations
 import json
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Iterable
 
 from .config_loader import AppConfig
 from .fetchers import CloudscraperFetcher, FetchChain, PlaywrightFetcher
 from .sites import SCRAPERS, Scraper
+from .sites._dates import parse_to_iso
 from .sites._filter import project_jobs
+from .types import Job
 
 
 def default_fetch_chain() -> FetchChain:
     return FetchChain([CloudscraperFetcher(), PlaywrightFetcher()])
+
+
+def _enrich_posted_at(jobs: list[Job]) -> None:
+    for job in jobs:
+        if job.get("posted_at") is None:
+            job["posted_at"] = parse_to_iso(job.get("posted_date"))
+
+
+def _within_max_age(job: Job, cutoff: datetime | None) -> bool:
+    if cutoff is None:
+        return True
+    raw = job.get("posted_at")
+    if not isinstance(raw, str):
+        return True
+    try:
+        parsed = datetime.fromisoformat(raw)
+    except ValueError:
+        return True
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed >= cutoff
 
 
 def run_one(
@@ -22,6 +46,7 @@ def run_one(
     output_dir: Path,
     keyword: str,
     fields: frozenset[str],
+    max_age_hours: int | None,
 ) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     json_path = output_dir / f"{scraper.name}.json"
@@ -42,13 +67,29 @@ def run_one(
     )
 
     jobs = scraper.parse(html)
-    print(f"[{scraper.name}] parsed {len(jobs)} job(s)")
+    parsed_count = len(jobs)
+    print(f"[{scraper.name}] parsed {parsed_count} job(s)")
+
+    _enrich_posted_at(jobs)
+
+    cutoff: datetime | None = None
+    if max_age_hours is not None:
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
+        before = len(jobs)
+        jobs = [j for j in jobs if _within_max_age(j, cutoff)]
+        dropped = before - len(jobs)
+        print(
+            f"[{scraper.name}] max_age={max_age_hours}h kept {len(jobs)}/{before} "
+            f"(dropped {dropped})"
+        )
+
     projected = project_jobs(jobs, fields)
     json_path.write_text(
         json.dumps(
             {
                 "keyword": keyword,
                 "fields": sorted(fields),
+                "max_age_hours": max_age_hours,
                 "count": len(projected),
                 "jobs": projected,
             },
@@ -103,7 +144,14 @@ def run(
             return
         scraper_cls = SCRAPERS[name]
         scraper = scraper_cls(url=site_cfg.url, limit=config.limit)
-        run_one(scraper, fetcher, out, config.keyword, config.fields_for(name))
+        run_one(
+            scraper,
+            fetcher,
+            out,
+            config.keyword,
+            config.fields_for(name),
+            config.max_age_for(name),
+        )
 
     workers = max(1, min(config.concurrency, len(selected)))
     if workers == 1 or len(selected) == 1:
