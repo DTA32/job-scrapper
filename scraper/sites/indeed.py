@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from bs4 import BeautifulSoup
 
-from ..types import Job
+from ..types import Job, empty_job
 from .base import Scraper
 
 
@@ -41,6 +41,16 @@ class IndeedScraper(Scraper):
                 or card.select_one("h2.jobTitle a")
                 or card.select_one("a[data-jk]")
             )
+            salary_el = (
+                card.select_one("[data-testid='attribute_snippet_testid']")
+                or card.select_one(".salary-snippet-container")
+                or card.select_one(".metadata.salary-snippet-container")
+            )
+            posted_el = (
+                card.select_one("[data-testid='myJobsStateDate']")
+                or card.select_one("span.date")
+                or card.select_one(".date")
+            )
 
             title = title_el.get_text(" ", strip=True) if title_el else None
             if title_el and not title and title_el.has_attr("title"):
@@ -51,13 +61,17 @@ class IndeedScraper(Scraper):
                     title = str(title_attr[0])
             company = company_el.get_text(" ", strip=True) if company_el else None
             location = loc_el.get_text(" ", strip=True) if loc_el else None
+            salary = salary_el.get_text(" ", strip=True) if salary_el else None
+            posted_date = posted_el.get_text(" ", strip=True) if posted_el else None
 
             url: str | None = None
+            jk: str | None = None
             if link_el:
                 href_value = link_el.get("href")
                 jk_value = link_el.get("data-jk")
                 if jk_value:
-                    url = f"https://id.indeed.com/viewjob?jk={jk_value}"
+                    jk = str(jk_value)
+                    url = f"https://id.indeed.com/viewjob?jk={jk}"
                 elif href_value:
                     href = str(href_value)
                     url = (
@@ -71,15 +85,14 @@ class IndeedScraper(Scraper):
                 continue
             seen.add(key)
 
-            results.append(
-                Job(
-                    site=self.name,
-                    title=title,
-                    company=company,
-                    location=location,
-                    url=url,
-                )
-            )
+            job = empty_job(self.name, title, company)
+            job["location"] = location
+            job["url"] = url
+            job["job_id"] = jk
+            job["salary"] = salary
+            job["posted_date"] = posted_date
+
+            results.append(job)
             if len(results) >= self.limit:
                 break
         return results

@@ -4,7 +4,7 @@ import re
 
 from bs4 import BeautifulSoup
 
-from ..types import Job
+from ..types import Job, empty_job
 from ._next_data import extract_next_data, walk_dicts
 from .base import Scraper
 
@@ -31,6 +31,58 @@ def _location_from_candidate(candidate: dict) -> str | None:
         return location.get("name") or location.get("label")
     if isinstance(location, str):
         return location
+    return None
+
+
+def _salary_from_candidate(candidate: dict) -> str | None:
+    salary = candidate.get("salary") or candidate.get("salaryEstimate")
+    if isinstance(salary, dict):
+        if isinstance(salary.get("displayText"), str):
+            return salary["displayText"]
+        currency = salary.get("currencyCode") or salary.get("currency") or ""
+        min_amount = salary.get("minAmount") or salary.get("min")
+        max_amount = salary.get("maxAmount") or salary.get("max")
+        if min_amount and max_amount:
+            return f"{currency} {min_amount}-{max_amount}".strip()
+        if min_amount:
+            return f"{currency} {min_amount}".strip()
+    if isinstance(salary, str):
+        return salary
+    return None
+
+
+def _posted_date_from_candidate(candidate: dict) -> str | None:
+    for key in ("publishedAt", "createdAt", "updatedAt", "postedAt"):
+        value = candidate.get(key)
+        if isinstance(value, str) and value:
+            return value
+    return None
+
+
+def _work_type_from_candidate(candidate: dict) -> str | None:
+    for key in ("workArrangementOption", "workType", "remoteType"):
+        value = candidate.get(key)
+        if isinstance(value, str) and value:
+            return value.lower()
+    return None
+
+
+def _employment_type_from_candidate(candidate: dict) -> str | None:
+    for key in ("jobType", "type", "employmentType"):
+        value = candidate.get(key)
+        if isinstance(value, str) and value:
+            return value.lower()
+    return None
+
+
+def _experience_level_from_candidate(candidate: dict) -> str | None:
+    for key in ("seniorityLevel", "experienceLevel", "experience"):
+        value = candidate.get(key)
+        if isinstance(value, str) and value:
+            return value.lower()
+    if isinstance(candidate.get("minYearsOfExperience"), (int, float)):
+        years = int(candidate["minYearsOfExperience"])
+        return f"{years}+ years"
     return None
 
 
@@ -66,17 +118,22 @@ class GlintsScraper(Scraper):
             if key in seen:
                 continue
             seen.add(key)
+
+            job = empty_job(self.name, str(title).strip(), str(company).strip())
             location = _location_from_candidate(candidate)
+            job["location"] = str(location).strip() if location else None
             slug = candidate.get("slug") or candidate.get("id")
-            results.append(
-                Job(
-                    site=self.name,
-                    title=str(title).strip(),
-                    company=str(company).strip(),
-                    location=str(location).strip() if location else None,
-                    url=f"https://glints.com/id/opportunities/jobs/{slug}" if slug else None,
-                )
+            job["job_id"] = str(slug) if slug else None
+            job["url"] = (
+                f"https://glints.com/id/opportunities/jobs/{slug}" if slug else None
             )
+            job["salary"] = _salary_from_candidate(candidate)
+            job["posted_date"] = _posted_date_from_candidate(candidate)
+            job["work_type"] = _work_type_from_candidate(candidate)
+            job["employment_type"] = _employment_type_from_candidate(candidate)
+            job["experience_level"] = _experience_level_from_candidate(candidate)
+
+            results.append(job)
             if len(results) >= self.limit:
                 break
         return results
@@ -105,19 +162,21 @@ class GlintsScraper(Scraper):
                 if container
                 else None
             )
+            salary_el = (
+                container.find(class_=re.compile(r"Salary", re.I))
+                if container
+                else None
+            )
             company = company_el.get_text(" ", strip=True) if company_el else None
             location = loc_el.get_text(" ", strip=True) if loc_el else None
+            salary = salary_el.get_text(" ", strip=True) if salary_el else None
             url = href if href.startswith("http") else f"https://glints.com{href}"
             if title and company:
-                results.append(
-                    Job(
-                        site=self.name,
-                        title=title,
-                        company=company,
-                        location=location,
-                        url=url,
-                    )
-                )
+                job = empty_job(self.name, title, company)
+                job["location"] = location
+                job["url"] = url
+                job["salary"] = salary
+                results.append(job)
                 if len(results) + skip >= self.limit:
                     break
         return results

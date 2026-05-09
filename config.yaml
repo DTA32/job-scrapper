@@ -3,6 +3,18 @@ limit: 2
 concurrency: 2
 output_dir: output
 
+# Fields included by default for every site (canonical names).
+# Allowed: title, company, url, location, salary, posted_date,
+# work_type, employment_type, experience_level, job_id.
+# site, title, company, url are always included regardless of this list.
+default_fields:
+  - title
+  - company
+  - location
+  - url
+  - salary
+  - posted_date
+
 sites:
   jobstreet:
     enabled: true
@@ -11,10 +23,25 @@ sites:
   glints:
     enabled: true
     url_template: "https://glints.com/id/opportunities/jobs/explore?keyword={keyword}&country=ID"
+    fields:
+      - title
+      - company
+      - location
+      - url
+      - salary
+      - posted_date
+      - work_type
+      - experience_level
 
   linkedin:
     enabled: true
     url_template: "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords={keyword}&location=Indonesia&start=0"
+    fields:
+      - title
+      - company
+      - location
+      - url
+      - posted_date
 
   indeed:
     enabled: true

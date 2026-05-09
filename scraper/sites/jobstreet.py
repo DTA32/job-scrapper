@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from bs4 import BeautifulSoup
 
-from ..types import Job
+from ..types import Job, empty_job
 from ._next_data import extract_next_data, walk_dicts
 from .base import Scraper
 
@@ -32,6 +32,56 @@ def _location_from_candidate(candidate: dict) -> str | None:
         return str(first)
     if isinstance(location, str):
         return location
+    return None
+
+
+def _salary_from_candidate(candidate: dict) -> str | None:
+    if isinstance(candidate.get("salaryLabel"), str):
+        return candidate["salaryLabel"]
+    salary = candidate.get("salary")
+    if isinstance(salary, dict):
+        for key in ("label", "displayText", "text"):
+            if isinstance(salary.get(key), str):
+                return salary[key]
+    if isinstance(candidate.get("salaryRange"), str):
+        return candidate["salaryRange"]
+    return None
+
+
+def _posted_date_from_candidate(candidate: dict) -> str | None:
+    for key in ("listingDate", "createdDate", "createdAt", "postedDate"):
+        value = candidate.get(key)
+        if isinstance(value, str) and value:
+            return value
+    return None
+
+
+def _work_type_from_candidate(candidate: dict) -> str | None:
+    arrangements = candidate.get("workArrangements")
+    if isinstance(arrangements, list) and arrangements:
+        first = arrangements[0]
+        if isinstance(first, dict):
+            label = first.get("label") or first.get("name")
+            if isinstance(label, str):
+                return label.lower()
+        if isinstance(first, str):
+            return first.lower()
+    return None
+
+
+def _employment_type_from_candidate(candidate: dict) -> str | None:
+    work_types = candidate.get("workTypes")
+    if isinstance(work_types, list) and work_types:
+        first = work_types[0]
+        if isinstance(first, dict):
+            label = first.get("label") or first.get("name")
+            if isinstance(label, str):
+                return label.lower()
+        if isinstance(first, str):
+            return first.lower()
+    employment = candidate.get("employmentType")
+    if isinstance(employment, str):
+        return employment.lower()
     return None
 
 
@@ -68,17 +118,21 @@ class JobstreetScraper(Scraper):
             if key in seen:
                 continue
             seen.add(key)
+
+            job = empty_job(self.name, str(title).strip(), str(company).strip())
             location = _location_from_candidate(candidate)
+            job["location"] = str(location).strip() if location else None
             job_id = candidate.get("id")
-            results.append(
-                Job(
-                    site=self.name,
-                    title=str(title).strip(),
-                    company=str(company).strip(),
-                    location=str(location).strip() if location else None,
-                    url=f"https://id.jobstreet.com/id/job/{job_id}" if job_id else None,
-                )
+            job["job_id"] = str(job_id) if job_id else None
+            job["url"] = (
+                f"https://id.jobstreet.com/id/job/{job_id}" if job_id else None
             )
+            job["salary"] = _salary_from_candidate(candidate)
+            job["posted_date"] = _posted_date_from_candidate(candidate)
+            job["work_type"] = _work_type_from_candidate(candidate)
+            job["employment_type"] = _employment_type_from_candidate(candidate)
+
+            results.append(job)
             if len(results) >= self.limit:
                 break
         return results
@@ -93,9 +147,21 @@ class JobstreetScraper(Scraper):
             title_el = card.select_one("[data-automation='jobTitle']") or card.select_one("a")
             company_el = card.select_one("[data-automation='jobCompany']")
             loc_el = card.select_one("[data-automation='jobLocation']")
+            salary_el = card.select_one("[data-automation='jobSalary']")
+            posted_el = card.select_one("[data-automation='jobListingDate']")
+            work_type_el = card.select_one("[data-automation='workArrangement']")
+
             title = title_el.get_text(strip=True) if title_el else None
             company = company_el.get_text(strip=True) if company_el else None
             location = loc_el.get_text(strip=True) if loc_el else None
+            salary = salary_el.get_text(" ", strip=True) if salary_el else None
+            posted_date = posted_el.get_text(" ", strip=True) if posted_el else None
+            work_type = (
+                work_type_el.get_text(" ", strip=True).lower()
+                if work_type_el
+                else None
+            )
+
             href_value = title_el.get("href") if title_el and title_el.name == "a" else None
             href = str(href_value) if href_value else None
             url = (
@@ -103,16 +169,15 @@ class JobstreetScraper(Scraper):
                 if href and href.startswith("/")
                 else href
             )
+
             if title and company:
-                results.append(
-                    Job(
-                        site=self.name,
-                        title=title,
-                        company=company,
-                        location=location,
-                        url=url,
-                    )
-                )
+                job = empty_job(self.name, title, company)
+                job["location"] = location
+                job["url"] = url
+                job["salary"] = salary
+                job["posted_date"] = posted_date
+                job["work_type"] = work_type
+                results.append(job)
                 if len(results) + skip >= self.limit:
                     break
         return results

@@ -9,6 +9,7 @@ from typing import Iterable
 from .config_loader import AppConfig
 from .fetchers import CloudscraperFetcher, FetchChain, PlaywrightFetcher
 from .sites import SCRAPERS, Scraper
+from .sites._filter import project_jobs
 
 
 def default_fetch_chain() -> FetchChain:
@@ -20,6 +21,7 @@ def run_one(
     fetcher: FetchChain,
     output_dir: Path,
     keyword: str,
+    fields: frozenset[str],
 ) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     json_path = output_dir / f"{scraper.name}.json"
@@ -41,9 +43,15 @@ def run_one(
 
     jobs = scraper.parse(html)
     print(f"[{scraper.name}] parsed {len(jobs)} job(s)")
+    projected = project_jobs(jobs, fields)
     json_path.write_text(
         json.dumps(
-            {"keyword": keyword, "count": len(jobs), "jobs": jobs},
+            {
+                "keyword": keyword,
+                "fields": sorted(fields),
+                "count": len(projected),
+                "jobs": projected,
+            },
             indent=2,
         )
     )
@@ -95,7 +103,7 @@ def run(
             return
         scraper_cls = SCRAPERS[name]
         scraper = scraper_cls(url=site_cfg.url, limit=config.limit)
-        run_one(scraper, fetcher, out, config.keyword)
+        run_one(scraper, fetcher, out, config.keyword, config.fields_for(name))
 
     workers = max(1, min(config.concurrency, len(selected)))
     if workers == 1 or len(selected) == 1:

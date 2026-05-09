@@ -62,7 +62,13 @@ def scrape_jobs(sites: list[str] | None = None) -> dict[str, Any]:
             keyword: search term resolved from config.yaml
             requested: list of site names actually attempted
             results: list of per-site result objects
-                ({site, count, jobs, ...}) read from output/<name>.json
+                ({site, fields, count, jobs}) read from output/<name>.json.
+                Each job is a dict projected to the fields configured for that
+                site. The canonical field set is:
+                  site, title, company, url, location, salary, posted_date,
+                  work_type, employment_type, experience_level, job_id.
+                Fields a site cannot extract are returned as null. The fields
+                a site emits are listed in `fields` for that site's result.
             errors: list of {site, reason} for any sites that failed to write
     """
     try:
