@@ -10,7 +10,7 @@ RUN pip install --no-cache-dir --upgrade pip \
  && pip install --no-cache-dir --user -r requirements.txt
 
 
-FROM mcr.microsoft.com/playwright/python:${PLAYWRIGHT_VERSION}
+FROM mcr.microsoft.com/playwright/python:${PLAYWRIGHT_VERSION} AS runtime-base
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -29,5 +29,23 @@ COPY --chown=pwuser:pwuser config.yaml ./config.yaml
 
 USER pwuser
 
+
+FROM runtime-base AS scraper-cli
+
 ENTRYPOINT ["python", "-m", "scraper"]
+CMD []
+
+
+FROM runtime-base AS mcp-server
+
+USER root
+COPY --chown=pwuser:pwuser mcp_server ./mcp_server
+USER pwuser
+
+ENV MCP_HOST=0.0.0.0 \
+    MCP_PORT=8080
+
+EXPOSE 8080
+
+ENTRYPOINT ["python", "-m", "mcp_server.server"]
 CMD []
