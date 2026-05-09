@@ -1,0 +1,43 @@
+services:
+  output-init:
+    image: mcr.microsoft.com/playwright/python:v1.59.0-jammy
+    container_name: job-scraper-init
+    user: "0:0"
+    entrypoint: ["sh", "-c", "chown -R 1000:1000 /out"]
+    volumes:
+      - ./output:/out
+    restart: "no"
+
+  scraper:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: scraper-cli
+    image: job-scraper:latest
+    container_name: job-scraper
+    restart: "no"
+    depends_on:
+      output-init:
+        condition: service_completed_successfully
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+      - ./output:/app/output
+
+  scraper-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: mcp-server
+    image: job-scraper-mcp:latest
+    container_name: job-scraper-mcp
+    restart: unless-stopped
+    profiles: ["mcp"]
+    depends_on:
+      output-init:
+        condition: service_completed_successfully
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./config.yaml:/app/config.yaml
+      - ./output:/app/output
+      - ./docs:/app/docs:ro

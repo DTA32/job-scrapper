@@ -1,0 +1,86 @@
+keywords:
+  - software engineer
+  - data analyst
+
+limit: 2
+concurrency: 2
+output_dir: output
+
+# Bot-side settings. Read by the scraper-bot image (cron + Discord posting).
+# Change here, push, redeploy.
+bot:
+  # Supercronic schedule (5-field cron OR @every / @daily / @hourly).
+  # Evaluated in the container's timezone — set TZ env on the bot container
+  # to control (workflow defaults to Asia/Jakarta).
+  schedule: "0 10 * * *"
+
+  # Max characters per Discord message. Discord allows 2000; keep margin.
+  max_chars: 1900
+
+  # Per-job Discord message template. Bot interpolates {field} placeholders
+  # against each job's canonical fields. Skip lines whose value is null.
+  message_template: |
+    ## {title}
+    {company} | {location} | {posted_date}
+    [link]({url})
+
+    Matched: {matched_keyword} on {site}
+
+# Drop jobs older than this many hours. Comment out / remove for no filter.
+# Per-site override available under sites.<name>.max_age_hours.
+# Pair this value with the URL templates below: jobstreet/indeed take a "1"
+# (days) and linkedin takes seconds (e.g. r86400 = 24h).
+max_age_hours: 24
+
+# See docs/filters.md for allowed values and matching semantics.
+filter:
+  location: [jakarta, tangerang]
+  employment_type: [full-time, internship]
+  work_type: [remote, hybrid]
+
+# Fields included by default for every site (canonical names).
+# Allowed: title, company, url, location, salary, posted_date, posted_at,
+# work_type, employment_type, experience_level, job_id, matched_keyword.
+# site, matched_keyword, title, company, url are always included.
+default_fields:
+  - title
+  - company
+  - location
+  - url
+  - salary
+  - posted_date
+  - posted_at
+
+sites:
+  jobstreet:
+    enabled: true
+    url_template: "https://id.jobstreet.com/id/{keyword_slug}-jobs?daterange=1"
+
+  glints:
+    enabled: true
+    url_template: "https://glints.com/id/opportunities/jobs/explore?keyword={keyword}&country=ID"
+    fields:
+      - title
+      - company
+      - location
+      - url
+      - salary
+      - posted_date
+      - posted_at
+      - work_type
+      - experience_level
+
+  linkedin:
+    enabled: true
+    url_template: "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords={keyword}&location=Indonesia&f_TPR=r86400&start=0"
+    fields:
+      - title
+      - company
+      - location
+      - url
+      - posted_date
+      - posted_at
+
+  indeed:
+    enabled: true
+    url_template: "https://id.indeed.com/jobs?q={keyword_plus}&l=Indonesia&fromage=1"

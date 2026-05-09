@@ -52,10 +52,20 @@ dmypy.json
 Thumbs.db
 
 # Project-specific scraper artifacts
+output/*
+!output/.gitkeep
 *.debug.html
 run.log
 *.log
+config.yaml.bak.*
 
 # Playwright
 playwright-report/
 test-results/
+# Added by code-review-graph
+.code-review-graph/
+
+# Agent
+.claude/
+CLAUDE.md
+.mcp.json
