@@ -7,7 +7,9 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Iterable
 
-from .config_loader import AppConfig, keyword_slug
+from urllib.parse import urlparse
+
+from .config_loader import ALLOWED_URL_HOSTS, AppConfig, keyword_slug
 from .fetchers import CloudscraperFetcher, FetchChain, PlaywrightFetcher
 from .sites import SCRAPERS, Scraper
 from .sites._dates import parse_to_iso
@@ -42,6 +44,39 @@ def _within_max_age(job: Job, cutoff: datetime | None) -> bool:
     return parsed >= cutoff
 
 
+def _fetch_requirements(
+    jobs: list[Job],
+    fields: frozenset[str],
+    fetcher: FetchChain,
+    scraper: Scraper,
+) -> None:
+    if "requirements" not in fields or not jobs:
+        return
+
+    def _fetch_one(job: Job) -> str | None:
+        url = job.get("url")
+        if not url:
+            return None
+        try:
+            host = (urlparse(url).hostname or "").lower()
+        except Exception:
+            return None
+        if host not in ALLOWED_URL_HOSTS:
+            return None
+        result = fetcher.fetch(url)
+        return scraper.parse_detail(result.html) if result.html else None
+
+    print(f"[{scraper.name}] fetching requirements for {len(jobs)} job(s)")
+    with ThreadPoolExecutor(max_workers=min(4, len(jobs))) as ex:
+        futures = {ex.submit(_fetch_one, job): i for i, job in enumerate(jobs)}
+        for fut in as_completed(futures):
+            idx = futures[fut]
+            try:
+                jobs[idx]["requirements"] = fut.result()
+            except Exception:
+                jobs[idx]["requirements"] = None
+
+
 def run_one(
     scraper: Scraper,
     fetcher: FetchChain,
@@ -57,12 +92,18 @@ def run_one(
     debug_path = output_dir / f"{scraper.name}.debug.html"
 
     print(f"[{label}] fetching {scraper.url}")
-    html = fetcher.fetch(scraper.url)
+    result = fetcher.fetch(scraper.url)
+    html = result.html
     if not html:
         print(f"[{label}] FAILED: no html", file=sys.stderr)
         json_path.write_text(
             json.dumps(
-                {"error": "fetch failed", "url": scraper.url, "keyword": keyword},
+                {
+                    "error": "fetch failed",
+                    "url": scraper.url,
+                    "keyword": keyword,
+                    "attempts": [a.to_dict() for a in result.attempts],
+                },
                 indent=2,
             )
         )
@@ -96,6 +137,8 @@ def run_one(
             f"[{label}] filter={content_filter} kept {len(jobs)}/{before} "
             f"(dropped {dropped})"
         )
+
+    _fetch_requirements(jobs, fields, fetcher, scraper)
 
     projected = project_jobs(jobs, fields)
     json_path.write_text(

@@ -5,13 +5,13 @@ import sys
 import cloudscraper
 
 from ..config import ACCEPT_LANGUAGE, USER_AGENT
-from .base import looks_like_challenge
+from .base import FetchAttempt, detect_challenge
 
 
 class CloudscraperFetcher:
     name = "cloudscraper"
 
-    def fetch(self, url: str) -> str | None:
+    def fetch(self, url: str) -> tuple[str | None, FetchAttempt]:
         try:
             scraper = cloudscraper.create_scraper(
                 browser={"browser": "chrome", "platform": "linux", "mobile": False}
@@ -22,17 +22,31 @@ class CloudscraperFetcher:
             response = scraper.get(url, timeout=30)
         except Exception as exc:
             print(f"[cloudscraper] error on {url}: {exc}", file=sys.stderr)
-            return None
+            return None, FetchAttempt(
+                fetcher=self.name,
+                code="runtime_error",
+                detail=f"{type(exc).__name__}: {exc}",
+            )
 
-        if response.status_code != 200:
+        status = response.status_code
+        if status != 200:
             print(
-                f"[cloudscraper] {url} status={response.status_code}",
+                f"[cloudscraper] {url} status={status}",
                 file=sys.stderr,
             )
-            return None
+            return None, FetchAttempt(
+                fetcher=self.name,
+                code=f"http_{status}",
+                detail=f"status={status}",
+            )
 
         text = response.text
-        if looks_like_challenge(text):
+        challenge = detect_challenge(text)
+        if challenge:
             print(f"[cloudscraper] {url} blocked by challenge page", file=sys.stderr)
-            return None
-        return text
+            return None, FetchAttempt(
+                fetcher=self.name,
+                code="challenge",
+                detail=challenge,
+            )
+        return text, FetchAttempt(fetcher=self.name, code="ok")
