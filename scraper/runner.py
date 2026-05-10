@@ -70,7 +70,7 @@ def _fetch_requirements(
             return None
         if host not in ALLOWED_URL_HOSTS:
             return None
-        result = fetcher.fetch(url)
+        result = scraper.detail_fetch(url, fetcher)
         return scraper.parse_detail(result.html) if result.html else None
 
     print(f"[{scraper.name}] fetching requirements for {len(jobs)} job(s)")

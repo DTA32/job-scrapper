@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import re
 from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 
 from bs4 import BeautifulSoup
 
 from ..types import Job, empty_job
 from .base import Scraper
+
+if TYPE_CHECKING:
+    from ..fetchers import FetchChain, FetchResult
 
 _RELATIVE_TIME_RE = re.compile(r'"formattedRelativeTime":"([^"]+)"')
 _PUB_DATE_RE = re.compile(r'"pubDate":(\d+)')
@@ -40,6 +44,25 @@ def _extract_date_map(html: str) -> dict[str, dict[str, str]]:
 
 class IndeedScraper(Scraper):
     name = "indeed"
+
+    def detail_fetch(self, url: str, fetcher: "FetchChain") -> "FetchResult":
+        from ..fetchers import FetchChain, PlaywrightFetcher
+
+        return FetchChain([PlaywrightFetcher()]).fetch(url)
+
+    def parse_detail(self, html: str) -> str | None:
+        soup = BeautifulSoup(html, "lxml")
+        for selector in (
+            "#jobDescriptionText",
+            ".jobsearch-jobDescriptionText",
+            "[data-testid='jobDescriptionText']",
+        ):
+            el = soup.select_one(selector)
+            if el:
+                text = el.get_text("\n", strip=True)
+                if text:
+                    return text
+        return None
 
     def parse(self, html: str) -> list[Job]:
         soup = BeautifulSoup(html, "lxml")
