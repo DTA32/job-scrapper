@@ -234,6 +234,38 @@ def update_config(patch: dict[str, Any]) -> dict[str, Any]:
 
 
 @mcp.tool()
+def get_scrape_status() -> dict[str, Any]:
+    """Return the status of the last scrape_jobs run plus recent log lines.
+
+    Returns:
+        dict with keys:
+            available: false when no run has been recorded yet
+            last_run: {timestamp, ok, duration_seconds, keywords, sites,
+                       total_jobs, error_count, errors}
+            last_error: last error entry with timestamp, or null if last run clean
+            per_site: {site_name: {last_run_at, last_status, last_job_count, last_error}}
+            recent_logs: last 30 lines from logs/scraper.log (empty list if no log file)
+    """
+    if not _STATUS_PATH.exists():
+        return {"available": False, "message": "No scrape run has been recorded yet."}
+
+    try:
+        status = json.loads(_STATUS_PATH.read_text())
+    except (json.JSONDecodeError, OSError) as exc:
+        return {"available": False, "error": f"Could not read status file: {exc}"}
+
+    recent_logs: list[str] = []
+    if _LOG_PATH.exists():
+        try:
+            lines = _LOG_PATH.read_text(encoding="utf-8", errors="replace").splitlines()
+            recent_logs = lines[-30:]
+        except OSError:
+            pass
+
+    return {"available": True, **status, "recent_logs": recent_logs}
+
+
+@mcp.tool()
 def scrape_jobs(
     sites: list[str] | None = None,
     keywords: list[str] | None = None,
