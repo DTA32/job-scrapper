@@ -1,11 +1,14 @@
+# scraper/fetchers/base.py
 from __future__ import annotations
 
 import re
-import sys
 from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
 from ..config import CHALLENGE_MARKERS
+from ..log import get_logger
+
+_LOG = get_logger()
 
 _TITLE_RE = re.compile(r"<title[^>]*>([^<]+)</title>", re.IGNORECASE)
 _CHALLENGE_TITLES = (
@@ -67,13 +70,14 @@ class FetchChain:
     def fetch(self, url: str) -> FetchResult:
         attempts: list[FetchAttempt] = []
         for fetcher in self._fetchers:
-            print(f"[fetch] trying {fetcher.name} for {url}", file=sys.stderr)
+            _LOG.debug("[fetch] trying %s for %s", fetcher.name, url)
             html, attempt = fetcher.fetch(url)
             attempts.append(attempt)
             if html and attempt.code == "ok":
                 return FetchResult(html=html, attempts=tuple(attempts))
-            print(
-                f"[fetch] {fetcher.name} insufficient ({attempt.code}), falling through",
-                file=sys.stderr,
+            _LOG.debug(
+                "[fetch] %s insufficient (%s), falling through",
+                fetcher.name,
+                attempt.code,
             )
         return FetchResult(html=None, attempts=tuple(attempts))

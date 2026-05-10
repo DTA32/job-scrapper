@@ -1,11 +1,12 @@
+# scraper/fetchers/curl_cffi.py
 from __future__ import annotations
 
-import sys
-
 from ..config import ACCEPT_LANGUAGE, USER_AGENT
+from ..log import get_logger
 from .base import FetchAttempt, detect_challenge
 
 CHROME_IMPERSONATE = "chrome131"
+_LOG = get_logger()
 
 
 class CurlCffiFetcher:
@@ -15,7 +16,7 @@ class CurlCffiFetcher:
         try:
             from curl_cffi import requests as cffi_requests  # type: ignore[attr-defined]
         except Exception as exc:
-            print(f"[curl_cffi] not installed: {exc}", file=sys.stderr)
+            _LOG.warning("[curl_cffi] not installed: %s", exc)
             return None, FetchAttempt(
                 fetcher=self.name,
                 code="not_installed",
@@ -33,7 +34,7 @@ class CurlCffiFetcher:
                 timeout=30,
             )
         except Exception as exc:
-            print(f"[curl_cffi] error on {url}: {exc}", file=sys.stderr)
+            _LOG.error("[curl_cffi] error on %s: %s", url, exc)
             return None, FetchAttempt(
                 fetcher=self.name,
                 code="runtime_error",
@@ -42,7 +43,7 @@ class CurlCffiFetcher:
 
         status = response.status_code
         if status != 200:
-            print(f"[curl_cffi] {url} status={status}", file=sys.stderr)
+            _LOG.warning("[curl_cffi] %s status=%d", url, status)
             return None, FetchAttempt(
                 fetcher=self.name,
                 code=f"http_{status}",
@@ -52,7 +53,7 @@ class CurlCffiFetcher:
         text = response.text
         challenge = detect_challenge(text)
         if challenge:
-            print(f"[curl_cffi] {url} blocked by challenge page", file=sys.stderr)
+            _LOG.warning("[curl_cffi] %s blocked by challenge page", url)
             return None, FetchAttempt(
                 fetcher=self.name,
                 code="challenge",
