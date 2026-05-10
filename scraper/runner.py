@@ -24,9 +24,9 @@ from .types import Job
 _LOG = get_logger()
 
 
-def default_fetch_chain() -> FetchChain:
+def default_fetch_chain(proxy: str | None = None) -> FetchChain:
     return FetchChain(
-        [CurlCffiFetcher(), CloudscraperFetcher(), PlaywrightFetcher()]
+        [CurlCffiFetcher(proxy=proxy), CloudscraperFetcher(proxy=proxy), PlaywrightFetcher(proxy=proxy)]
     )
 
 
@@ -225,7 +225,10 @@ def run(
         return 1
 
     pairs = _build_pairs(selected, keyword_list)
-    fetcher = default_fetch_chain()
+    proxy_url = config.proxy.url if config.proxy else None
+    if proxy_url:
+        _LOG.info("[runner] using proxy: %s", proxy_url)
+    fetcher = default_fetch_chain(proxy=proxy_url)
 
     def _process(pair: tuple[str, str]) -> None:
         keyword, name = pair

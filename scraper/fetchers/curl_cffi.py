@@ -12,6 +12,9 @@ _LOG = get_logger()
 class CurlCffiFetcher:
     name = "curl_cffi"
 
+    def __init__(self, proxy: str | None = None) -> None:
+        self._proxy = proxy
+
     def fetch(self, url: str) -> tuple[str | None, FetchAttempt]:
         try:
             from curl_cffi import requests as cffi_requests  # type: ignore[attr-defined]
@@ -23,7 +26,11 @@ class CurlCffiFetcher:
                 detail=f"{type(exc).__name__}: {exc}",
             )
 
+        if self._proxy:
+            _LOG.info("[curl_cffi] using proxy: %s", self._proxy)
+
         try:
+            proxies = {"http": self._proxy, "https": self._proxy} if self._proxy else None
             response = cffi_requests.get(
                 url,
                 impersonate=CHROME_IMPERSONATE,
@@ -32,6 +39,7 @@ class CurlCffiFetcher:
                     "Accept-Language": ACCEPT_LANGUAGE,
                 },
                 timeout=30,
+                proxies=proxies,
             )
         except Exception as exc:
             _LOG.error("[curl_cffi] error on %s: %s", url, exc)

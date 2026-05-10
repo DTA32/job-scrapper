@@ -109,8 +109,10 @@ jobs:
 
             docker run -d \
               --name "$CONTAINER_NAME" \
+              --network host \
               --restart unless-stopped \
               -p 8080:8080 \
+              -e PROXY_URL="${PROXY_URL:-}" \
               "$IMAGE_TAG"
             docker ps --filter "name=$CONTAINER_NAME"
         env:

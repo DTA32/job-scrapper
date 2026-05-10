@@ -220,6 +220,64 @@ The loader (`load(path)`) enforces:
 | `filter` keys             | One of `location`, `employment_type`, `work_type`; unknown → warning, dropped | `[config] warning` |
 | `filter` values           | String or list-of-strings                        | `ConfigError`     |
 
+
+## Proxy configuration
+
+Route HTTP requests through a proxy server. Useful for bypassing datacenter IP blocks by using residential IPs.
+
+```yaml
+proxy: "socks5://localhost:1080"
+```
+
+### Supported proxy formats
+
+| Format | Example | Use case |
+|--------|---------|----------|
+| SOCKS5 | `socks5://localhost:1080` | SSH tunnels, residential proxies |
+| HTTP | `http://proxy.example.com:8080` | Corporate proxies |
+| HTTPS | `https://proxy.example.com:8080` | Secure corporate proxies |
+| Auth | `socks5://user:pass@host:1080` | Authenticated proxies |
+
+### Common setup: SSH tunnel
+
+On VPS (remote server), create SOCKS5 tunnel to your home machine:
+
+```bash
+# From VPS, connect to your home machine
+ssh -D 1080 -f -N user@your-home-ip
+
+# Test proxy works
+curl --socks5 localhost:1080 http://httpbin.org/ip
+# Should show your home IP, not VPS IP
+```
+
+Then in `config.yaml`:
+```yaml
+proxy: "socks5://localhost:1080"
+```
+
+### Docker considerations
+
+When using `--network host` mode (required for localhost proxy):
+- Container shares host network stack
+- `localhost:1080` inside container = `localhost:1080` on VPS host
+- No port mapping needed
+
+### Environment variable override
+
+Set `PROXY_URL` environment variable to override config file:
+
+```bash
+PROXY_URL="socks5://localhost:1080" python -m scraper
+```
+
+### Disable proxy
+
+Comment out or remove the `proxy` key:
+```yaml
+# proxy: "socks5://localhost:1080"
+```
+
 ## Loading the resolved config
 
 ```python
