@@ -1,5 +1,9 @@
 keywords:
   - software engineer
+  - back end engineer
+  - project manager
+  - product owner
+  - quality assurance
   - data analyst
 
 limit: 5
@@ -32,13 +36,13 @@ bot:
 # Per-site override available under sites.<name>.max_age_hours.
 # Pair this value with the URL templates below: jobstreet/indeed take a "1"
 # (days) and linkedin takes seconds (e.g. r86400 = 24h).
-max_age_hours: 96
+max_age_hours: 24
 
 # See docs/filters.md for allowed values and matching semantics.
 filter:
-  location: [jakarta, tangerang]
-  employment_type: [full-time, internship]
-  work_type: [remote, hybrid]
+  location: [jakarta, tangerang, bandung, bekasi]
+  employment_type: [full-time, internship, contract, part-time]
+  work_type: [remote, hybrid, onsite]
 
 # Fields included by default for every site (canonical names).
 # Allowed: title, company, url, location, salary, posted_date, posted_at,
