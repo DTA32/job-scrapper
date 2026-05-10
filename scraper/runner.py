@@ -10,7 +10,12 @@ from typing import Iterable
 from urllib.parse import urlparse
 
 from .config_loader import ALLOWED_URL_HOSTS, AppConfig, keyword_slug
-from .fetchers import CloudscraperFetcher, FetchChain, PlaywrightFetcher
+from .fetchers import (
+    CloudscraperFetcher,
+    CurlCffiFetcher,
+    FetchChain,
+    PlaywrightFetcher,
+)
 from .sites import SCRAPERS, Scraper
 from .sites._dates import parse_to_iso
 from .sites._filter import apply_filter, project_jobs
@@ -18,7 +23,9 @@ from .types import Job
 
 
 def default_fetch_chain() -> FetchChain:
-    return FetchChain([CloudscraperFetcher(), PlaywrightFetcher()])
+    return FetchChain(
+        [CurlCffiFetcher(), CloudscraperFetcher(), PlaywrightFetcher()]
+    )
 
 
 def _enrich_jobs(jobs: list[Job], keyword: str) -> None:
