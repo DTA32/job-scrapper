@@ -186,6 +186,7 @@ def _fetch_jobs_from_api(keyword: str, where: str, limit: int) -> list[dict]:
 
 class IndeedScraper(Scraper):
     name = "indeed"
+    requires_search_html = False
 
     def parse(self, html: str) -> list[Job]:
         keyword, where = _extract_search_params(self.url)
