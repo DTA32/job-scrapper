@@ -20,6 +20,20 @@ def _extract_job_id(url: str | None) -> str | None:
 class LinkedinScraper(Scraper):
     name = "linkedin"
 
+    def parse_detail(self, html: str) -> str | None:
+        soup = BeautifulSoup(html, "lxml")
+        for selector in (
+            ".show-more-less-html__markup",
+            ".description__text",
+            ".jobs-box__html-content",
+        ):
+            el = soup.select_one(selector)
+            if el:
+                text = el.get_text("\n", strip=True)
+                if text:
+                    return text
+        return None
+
     def parse(self, html: str) -> list[Job]:
         soup = BeautifulSoup(html, "lxml")
         cards = soup.select("li") or soup.select("div.base-search-card")
