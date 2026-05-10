@@ -16,12 +16,15 @@ services:
     image: job-scraper:latest
     container_name: job-scraper
     restart: "no"
+    network_mode: host
     depends_on:
       output-init:
         condition: service_completed_successfully
     volumes:
       - ./config.yaml:/app/config.yaml:ro
       - ./output:/app/output
+    environment:
+      - PROXY_URL=${PROXY_URL:-}
 
   scraper-mcp:
     build:

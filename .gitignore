@@ -73,3 +73,8 @@ test-results/
 .claude/
 CLAUDE.md
 .mcp.json
+
+# User-specific Cursor/Claude config
+.cursor/
+.cursorrules
+AGENTS.md

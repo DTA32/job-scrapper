@@ -10,6 +10,11 @@ limit: 5
 concurrency: 2
 output_dir: output
 
+# Proxy configuration for residential IP routing
+# Format: "socks5://localhost:1080" or "http://proxy.example.com:8080"
+# Comment out to disable proxy and use direct connection
+proxy: "socks5://localhost:1080"
+
 # Bot-side settings. Read by the scraper-bot image (cron + Discord posting).
 # Change here, push, redeploy.
 bot:
