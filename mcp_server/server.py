@@ -6,6 +6,7 @@ import shutil
 import tempfile
 import time
 from copy import deepcopy
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -13,11 +14,15 @@ import yaml
 from mcp.server.fastmcp import FastMCP
 
 from scraper.config_loader import AppConfig, ConfigError, keyword_slug, load
+from scraper.log import get_logger as _get_logger
 from scraper.runner import run as run_scraper
 
 DEFAULT_CONFIG_PATH = Path(os.environ.get("SCRAPER_CONFIG", "config.yaml"))
 HOST = os.environ.get("MCP_HOST", "0.0.0.0")
 PORT = int(os.environ.get("MCP_PORT", "8080"))
+
+_STATUS_PATH = Path("logs/status.json")
+_LOG_PATH = Path("logs/scraper.log")
 
 mcp = FastMCP("job-scraper", host=HOST, port=PORT)
 
@@ -53,6 +58,68 @@ def _atomic_write_yaml(path: Path, data: dict) -> None:
     tmp_path = path.with_suffix(path.suffix + ".tmp")
     tmp_path.write_text(serialized)
     tmp_path.replace(path)
+
+
+def _write_status(result: dict[str, Any], duration: float) -> None:
+    now = datetime.now(timezone.utc).isoformat()
+    errors: list[dict[str, Any]] = result.get("errors", [])
+
+    last_error: dict[str, Any] | None = None
+    if errors:
+        last_error = {**errors[-1], "timestamp": now}
+
+    per_site: dict[str, Any] = {}
+    for kw_result in result.get("results", []):
+        for site_entry in kw_result.get("sites", []):
+            name = site_entry.get("site")
+            if name:
+                per_site[name] = {
+                    "last_run_at": now,
+                    "last_status": "ok",
+                    "last_job_count": site_entry.get("count", 0),
+                    "last_error": None,
+                }
+    for err in errors:
+        name = err.get("site")
+        if name:
+            per_site[name] = {
+                "last_run_at": now,
+                "last_status": "error",
+                "last_job_count": 0,
+                "last_error": err.get("reason"),
+            }
+
+    existing_per_site: dict[str, Any] = {}
+    if _STATUS_PATH.exists():
+        try:
+            existing_per_site = json.loads(_STATUS_PATH.read_text()).get("per_site", {})
+        except (json.JSONDecodeError, OSError):
+            pass
+    merged_per_site = {**existing_per_site, **per_site}
+
+    total_jobs = sum(
+        site_entry.get("count", 0)
+        for kw_result in result.get("results", [])
+        for site_entry in kw_result.get("sites", [])
+    )
+
+    status = {
+        "last_run": {
+            "timestamp": now,
+            "ok": result.get("ok", False),
+            "duration_seconds": round(duration, 2),
+            "keywords": result.get("keywords", []),
+            "sites": result.get("requested_sites", []),
+            "total_jobs": total_jobs,
+            "error_count": len(errors),
+            "errors": errors,
+        },
+        "last_error": last_error,
+        "per_site": merged_per_site,
+    }
+
+    _STATUS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    _STATUS_PATH.write_text(json.dumps(status, indent=2))
 
 
 @mcp.tool()
