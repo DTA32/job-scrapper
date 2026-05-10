@@ -17,6 +17,7 @@ class Job(TypedDict):
     employment_type: str | None
     experience_level: str | None
     job_id: str | None
+    requirements: str | None
 
 
 CANONICAL_FIELDS: frozenset[str] = frozenset(
@@ -34,6 +35,7 @@ CANONICAL_FIELDS: frozenset[str] = frozenset(
         "employment_type",
         "experience_level",
         "job_id",
+        "requirements",
     }
 )
 
@@ -57,4 +59,5 @@ def empty_job(site: str, title: str, company: str) -> Job:
         employment_type=None,
         experience_level=None,
         job_id=None,
+        requirements=None,
     )

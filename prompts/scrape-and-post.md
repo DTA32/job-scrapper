@@ -43,7 +43,8 @@ MAX_CHARS="$(yq -r '.bot.max_chars // 1900' /workspace/config.yaml)"
 `TEMPLATE` carries `{placeholder}` tokens that match canonical Job field
 names (e.g. `{title}`, `{company}`, `{location}`, `{posted_date}`,
 `{url}`, `{matched_keyword}`, `{site}`, `{salary}`, `{work_type}`,
-`{employment_type}`, `{experience_level}`, `{job_id}`, `{posted_at}`).
+`{employment_type}`, `{experience_level}`, `{job_id}`, `{posted_at}`,
+`{requirements}`).
 
 ## Step 3 — Format per job
 

@@ -1,10 +1,13 @@
+# scraper/fetchers/playwright.py
 from __future__ import annotations
 
-import sys
 import time
 
 from ..config import USER_AGENT
+from ..log import get_logger
 from .base import FetchAttempt, detect_challenge
+
+_LOG = get_logger()
 
 
 class PlaywrightFetcher:
@@ -12,9 +15,9 @@ class PlaywrightFetcher:
 
     def fetch(self, url: str) -> tuple[str | None, FetchAttempt]:
         try:
-            from playwright.sync_api import sync_playwright
+            from playwright.sync_api import sync_playwright  # type: ignore[import-untyped]
         except Exception as exc:
-            print(f"[playwright] not installed: {exc}", file=sys.stderr)
+            _LOG.warning("[playwright] not installed: %s", exc)
             return None, FetchAttempt(
                 fetcher=self.name,
                 code="not_installed",
@@ -63,21 +66,23 @@ class PlaywrightFetcher:
                 context.close()
                 browser.close()
         except Exception as exc:
-            print(f"[playwright] error on {url}: {exc}", file=sys.stderr)
             msg = str(exc)
             lowered = msg.lower()
             if "asyncio" in lowered and "loop" in lowered:
+                _LOG.error("[playwright] asyncio conflict on %s", url)
                 return None, FetchAttempt(
                     fetcher=self.name,
                     code="runtime_error",
                     detail="asyncio sync-API conflict",
                 )
             if "timeout" in lowered:
+                _LOG.warning("[playwright] timeout on %s", url)
                 return None, FetchAttempt(
                     fetcher=self.name,
                     code="timeout",
                     detail=msg[:200],
                 )
+            _LOG.error("[playwright] error on %s: %s", url, exc)
             return None, FetchAttempt(
                 fetcher=self.name,
                 code="runtime_error",
@@ -86,7 +91,7 @@ class PlaywrightFetcher:
 
         challenge = detect_challenge(html)
         if challenge:
-            print(f"[playwright] {url} blocked by challenge page", file=sys.stderr)
+            _LOG.warning("[playwright] %s blocked by challenge page", url)
             return None, FetchAttempt(
                 fetcher=self.name,
                 code="challenge",

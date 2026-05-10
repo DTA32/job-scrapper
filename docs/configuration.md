@@ -99,7 +99,7 @@ Allowed canonical fields:
 site                matched_keyword     title             company
 url                 location            salary            posted_date
 posted_at           work_type           employment_type   experience_level
-job_id
+job_id              requirements
 ```
 
 - `site`, `matched_keyword`, `title`, `company`, `url` are **always

@@ -54,6 +54,10 @@ Thumbs.db
 # Project-specific scraper artifacts
 output/*
 !output/.gitkeep
+
+# Logs
+logs/*
+!logs/.gitkeep
 *.debug.html
 run.log
 *.log

@@ -65,7 +65,7 @@ Register from a Claude Code container:
   `concurrency` (default 2)
 - Per-site adapters extract a canonical Job schema (title, company,
   location, url, salary, posted_date, posted_at, work_type,
-  employment_type, experience_level, job_id, matched_keyword)
+  employment_type, experience_level, job_id, requirements, matched_keyword)
 - Recency filter (`max_age_hours`) drops stale jobs based on parsed
   `posted_at`; URL templates carry server-side recency params for
   efficiency

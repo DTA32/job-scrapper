@@ -157,8 +157,8 @@ workflow injects `TZ=Asia/Jakarta` by default — override by setting a
 Template placeholders match canonical Job field names — use any of:
 `title`, `company`, `url`, `location`, `salary`, `posted_date`,
 `posted_at`, `work_type`, `employment_type`, `experience_level`,
-`job_id`, `matched_keyword`, `site`. Lines whose placeholder resolves
-to null get dropped.
+`job_id`, `matched_keyword`, `site`, `requirements`. Lines whose
+placeholder resolves to null get dropped.
 
 Edit → commit → push to main → deploy rebuilds the bot image (for
 schedule) and the next run picks up template/max_chars changes

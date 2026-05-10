@@ -21,9 +21,13 @@ search result page (no detail-page fetch).
 | `employment_type` | partial   | ✅     | ❌       | ❌     |
 | `experience_level`| ❌        | ✅     | ❌       | ❌     |
 | `job_id`          | ✅        | ✅     | ✅       | ✅     |
+| `requirements`    | ✅        | ✅     | ✅       | ✅     |
 
 **✅** = reliably populated. **partial** = sometimes populated when the
 listing exposes it. **❌** = currently never populated by the parser.
+
+`requirements` is fetched via a second request to each job's detail URL
+and requires `requirements` to be in the site's `fields` list.
 
 Implication for filters: `work_type` and `employment_type` filters mostly
 affect Glints. Other sites pass via the conservative null-rule.

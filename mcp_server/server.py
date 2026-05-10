@@ -6,18 +6,23 @@ import shutil
 import tempfile
 import time
 from copy import deepcopy
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 import yaml
-from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp import FastMCP  # type: ignore[import-untyped]
 
 from scraper.config_loader import AppConfig, ConfigError, keyword_slug, load
+from scraper.log import get_logger as _get_logger
 from scraper.runner import run as run_scraper
 
 DEFAULT_CONFIG_PATH = Path(os.environ.get("SCRAPER_CONFIG", "config.yaml"))
 HOST = os.environ.get("MCP_HOST", "0.0.0.0")
 PORT = int(os.environ.get("MCP_PORT", "8080"))
+
+_STATUS_PATH = Path("logs/status.json")
+_LOG_PATH = Path("logs/scraper.log")
 
 mcp = FastMCP("job-scraper", host=HOST, port=PORT)
 
@@ -53,6 +58,68 @@ def _atomic_write_yaml(path: Path, data: dict) -> None:
     tmp_path = path.with_suffix(path.suffix + ".tmp")
     tmp_path.write_text(serialized)
     tmp_path.replace(path)
+
+
+def _write_status(result: dict[str, Any], duration: float) -> None:
+    now = datetime.now(timezone.utc).isoformat()
+    errors: list[dict[str, Any]] = result.get("errors", [])
+
+    last_error: dict[str, Any] | None = None
+    if errors:
+        last_error = {**errors[-1], "timestamp": now}
+
+    per_site: dict[str, Any] = {}
+    for kw_result in result.get("results", []):
+        for site_entry in kw_result.get("sites", []):
+            name = site_entry.get("site")
+            if name:
+                per_site[name] = {
+                    "last_run_at": now,
+                    "last_status": "ok",
+                    "last_job_count": site_entry.get("count", 0),
+                    "last_error": None,
+                }
+    for err in errors:
+        name = err.get("site")
+        if name:
+            per_site[name] = {
+                "last_run_at": now,
+                "last_status": "error",
+                "last_job_count": 0,
+                "last_error": err.get("reason"),
+            }
+
+    existing_per_site: dict[str, Any] = {}
+    if _STATUS_PATH.exists():
+        try:
+            existing_per_site = json.loads(_STATUS_PATH.read_text()).get("per_site", {})
+        except (json.JSONDecodeError, OSError):
+            pass
+    merged_per_site = {**existing_per_site, **per_site}
+
+    total_jobs = sum(
+        site_entry.get("count", 0)
+        for kw_result in result.get("results", [])
+        for site_entry in kw_result.get("sites", [])
+    )
+
+    status = {
+        "last_run": {
+            "timestamp": now,
+            "ok": result.get("ok", False),
+            "duration_seconds": round(duration, 2),
+            "keywords": result.get("keywords", []),
+            "sites": result.get("requested_sites", []),
+            "total_jobs": total_jobs,
+            "error_count": len(errors),
+            "errors": errors,
+        },
+        "last_error": last_error,
+        "per_site": merged_per_site,
+    }
+
+    _STATUS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    _STATUS_PATH.write_text(json.dumps(status, indent=2))
 
 
 @mcp.tool()
@@ -124,7 +191,7 @@ def update_config(patch: dict[str, Any]) -> dict[str, Any]:
         On failure: {ok: False, error: <reason>}
     """
     if not isinstance(patch, dict):
-        return {"ok": False, "error": "patch must be a dict"}
+        return {"ok": False, "error": "patch must be a dict"}  # pyright: ignore[reportUnreachable]
     if not DEFAULT_CONFIG_PATH.exists():
         return {"ok": False, "error": f"config file not found: {DEFAULT_CONFIG_PATH}"}
 
@@ -164,6 +231,38 @@ def update_config(patch: dict[str, Any]) -> dict[str, Any]:
         return {"ok": False, "error": f"write failed: {exc}"}
 
     return {"ok": True, "applied": merged, "backup": str(backup_path)}
+
+
+@mcp.tool()
+def get_scrape_status() -> dict[str, Any]:
+    """Return the status of the last scrape_jobs run plus recent log lines.
+
+    Returns:
+        dict with keys:
+            available: false when no run has been recorded yet
+            last_run: {timestamp, ok, duration_seconds, keywords, sites,
+                       total_jobs, error_count, errors}
+            last_error: last error entry with timestamp, or null if last run clean
+            per_site: {site_name: {last_run_at, last_status, last_job_count, last_error}}
+            recent_logs: last 30 lines from logs/scraper.log (empty list if no log file)
+    """
+    if not _STATUS_PATH.exists():
+        return {"available": False, "message": "No scrape run has been recorded yet."}
+
+    try:
+        status = json.loads(_STATUS_PATH.read_text())
+    except (json.JSONDecodeError, OSError) as exc:
+        return {"available": False, "error": f"Could not read status file: {exc}"}
+
+    recent_logs: list[str] = []
+    if _LOG_PATH.exists():
+        try:
+            lines = _LOG_PATH.read_text(encoding="utf-8", errors="replace").splitlines()
+            recent_logs = lines[-30:]
+        except OSError:
+            pass
+
+    return {"available": True, **status, "recent_logs": recent_logs}
 
 
 @mcp.tool()
@@ -209,9 +308,14 @@ def scrape_jobs(
                   - runtime_error     unexpected exception (detail = class+msg)
                   - not_installed     fetcher dependency missing
     """
+    log = _get_logger()
+    log.info("scrape_jobs called sites=%s keywords=%s", sites, keywords)
+    t_start = time.monotonic()
+
     try:
         config = _load_config(DEFAULT_CONFIG_PATH)
     except ConfigError as exc:
+        log.error("scrape_jobs config error: %s", exc)
         return {"error": str(exc)}
 
     target_sites = list(sites) if sites else list(config.enabled_site_names())
@@ -250,7 +354,10 @@ def scrape_jobs(
             per_site.append({"site": name, **payload})
         results.append({"keyword": keyword, "sites": per_site})
 
-    return {
+    total_jobs = sum(
+        s.get("count", 0) for r in results for s in r.get("sites", [])
+    )
+    result = {
         "ok": len(errors) == 0,
         "keywords": target_keywords,
         "requested_sites": target_sites,
@@ -258,6 +365,19 @@ def scrape_jobs(
         "results": results,
         "errors": errors,
     }
+
+    duration = time.monotonic() - t_start
+    log.info(
+        "scrape_jobs done ok=%s errors=%d jobs=%d duration=%.1fs",
+        result["ok"],
+        len(errors),
+        total_jobs,
+        duration,
+    )
+
+    _write_status(result, duration)
+
+    return result
 
 
 def main() -> None:
