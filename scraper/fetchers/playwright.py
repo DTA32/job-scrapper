@@ -15,7 +15,7 @@ class PlaywrightFetcher:
 
     def fetch(self, url: str) -> tuple[str | None, FetchAttempt]:
         try:
-            from playwright.sync_api import sync_playwright
+            from playwright.sync_api import sync_playwright  # type: ignore[import-untyped]
         except Exception as exc:
             _LOG.warning("[playwright] not installed: %s", exc)
             return None, FetchAttempt(

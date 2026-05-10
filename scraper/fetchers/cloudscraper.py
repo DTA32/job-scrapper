@@ -15,7 +15,7 @@ class CloudscraperFetcher:
 
     def fetch(self, url: str) -> tuple[str | None, FetchAttempt]:
         try:
-            scraper = cloudscraper.create_scraper(
+            scraper = cloudscraper.create_scraper(  # type: ignore[attr-defined]
                 browser={"browser": "chrome", "platform": "linux", "mobile": False}
             )
             scraper.headers.update(
