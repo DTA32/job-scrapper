@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING
 
 from ..types import Job
+
+if TYPE_CHECKING:
+    from ..fetchers import FetchChain, FetchResult
 
 
 class Scraper(ABC):
@@ -14,3 +18,9 @@ class Scraper(ABC):
 
     @abstractmethod
     def parse(self, html: str) -> list[Job]: ...
+
+    def parse_detail(self, html: str) -> str | None:
+        return None
+
+    def detail_fetch(self, url: str, fetcher: "FetchChain") -> "FetchResult":
+        return fetcher.fetch(url)
