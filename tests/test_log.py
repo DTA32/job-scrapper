@@ -1,8 +1,6 @@
 # tests/test_log.py
 from __future__ import annotations
 
-import logging
-
 
 def test_get_logger_returns_named_logger(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
