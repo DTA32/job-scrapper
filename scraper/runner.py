@@ -106,7 +106,7 @@ def run_one(
     _LOG.info("[%s] fetching %s", label, scraper.url)
     result = fetcher.fetch(scraper.url)
     html = result.html
-    if not html:
+    if not html and scraper.requires_search_html:
         _LOG.error("[%s] FAILED: no html", label)
         json_path.write_text(
             json.dumps(
@@ -121,10 +121,17 @@ def run_one(
         )
         return
 
-    debug_path.write_text(html)
-    _LOG.info("[%s] saved raw html → %s (%d bytes)", label, debug_path.name, len(html))
+    if html:
+        debug_path.write_text(html)
+        _LOG.info(
+            "[%s] saved raw html → %s (%d bytes)", label, debug_path.name, len(html)
+        )
+    else:
+        _LOG.info(
+            "[%s] no search html (scraper handles fetch internally)", label
+        )
 
-    jobs = scraper.parse(html)
+    jobs = scraper.parse(html or "")
     parsed_count = len(jobs)
     _LOG.info("[%s] parsed %d job(s)", label, parsed_count)
 

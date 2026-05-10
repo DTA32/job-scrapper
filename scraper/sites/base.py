@@ -11,6 +11,7 @@ if TYPE_CHECKING:
 
 class Scraper(ABC):
     name: str
+    requires_search_html: bool = True
 
     def __init__(self, url: str, limit: int) -> None:
         self.url = url
