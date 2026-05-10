@@ -153,6 +153,7 @@ sites:
     fields: [...]                                  # optional, overrides default_fields
     max_age_hours: 12                              # optional, overrides global
     filter: {...}                                  # optional, replaces global
+    limit: 10                                      # optional, overrides global limit
 ```
 
 #### `sites.<name>.enabled`
@@ -195,6 +196,13 @@ Optional integer. Replaces the global `max_age_hours` for this site only.
 
 Optional dict. Replaces (does not merge into) the global `filter` block for
 this site only. Same shape as the global filter — see [`filters.md`](filters.md).
+
+#### `sites.<name>.limit`
+
+Optional positive integer. Replaces the global `limit` for this site only —
+useful when one source's relevance ranking buries good matches deep in the
+list (e.g. raise `sites.indeed.limit` so Jakarta jobs surface past the top
+two non-Jakarta hits, while keeping other sites at the cheaper global limit).
 
 ## Validation rules summary
 

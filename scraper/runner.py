@@ -63,6 +63,9 @@ def _fetch_requirements(
         return
 
     def _fetch_one(job: Job) -> str | None:
+        existing = job.get("requirements")
+        if isinstance(existing, str) and existing.strip():
+            return existing
         url = job.get("url")
         if not url:
             return None
@@ -225,7 +228,7 @@ def run(
             return
         scraper_cls = SCRAPERS[name]
         url = site_cfg.url_for(keyword)
-        scraper = scraper_cls(url=url, limit=config.limit)
+        scraper = scraper_cls(url=url, limit=config.limit_for(name))
         keyword_dir = out / keyword_slug(keyword)
         if not keyword_dir.resolve().is_relative_to(out):
             _LOG.warning(
