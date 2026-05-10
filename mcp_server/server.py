@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp import FastMCP  # type: ignore[import-untyped]
 
 from scraper.config_loader import AppConfig, ConfigError, keyword_slug, load
 from scraper.log import get_logger as _get_logger
@@ -191,7 +191,7 @@ def update_config(patch: dict[str, Any]) -> dict[str, Any]:
         On failure: {ok: False, error: <reason>}
     """
     if not isinstance(patch, dict):
-        return {"ok": False, "error": "patch must be a dict"}
+        return {"ok": False, "error": "patch must be a dict"}  # pyright: ignore[reportUnreachable]
     if not DEFAULT_CONFIG_PATH.exists():
         return {"ok": False, "error": f"config file not found: {DEFAULT_CONFIG_PATH}"}
 

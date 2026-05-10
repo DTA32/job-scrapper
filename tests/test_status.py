@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from unittest.mock import patch
+
+from mcp_server.server import _write_status  # type: ignore[attr-defined]
+from mcp_server.server import get_scrape_status  # type: ignore[attr-defined]
 
 
 def _ok_result(keyword: str = "engineer", site: str = "glints", count: int = 3) -> dict:
@@ -31,7 +33,6 @@ def _err_result(keyword: str = "engineer", site: str = "glints") -> dict:
 def test_write_status_creates_file(tmp_path):
     status_path = tmp_path / "status.json"
     with patch("mcp_server.server._STATUS_PATH", status_path):
-        from mcp_server.server import _write_status
         _write_status(_ok_result(), 5.1)
 
     assert status_path.exists()
@@ -47,7 +48,6 @@ def test_write_status_creates_file(tmp_path):
 def test_write_status_records_error(tmp_path):
     status_path = tmp_path / "status.json"
     with patch("mcp_server.server._STATUS_PATH", status_path):
-        from mcp_server.server import _write_status
         _write_status(_err_result(), 2.0)
 
     data = json.loads(status_path.read_text())
@@ -74,7 +74,6 @@ def test_write_status_merges_existing_per_site(tmp_path):
         },
     }))
     with patch("mcp_server.server._STATUS_PATH", status_path):
-        from mcp_server.server import _write_status
         _write_status(_ok_result(site="glints"), 3.0)
 
     data = json.loads(status_path.read_text())
@@ -85,7 +84,6 @@ def test_write_status_merges_existing_per_site(tmp_path):
 
 def test_get_scrape_status_no_file(tmp_path):
     with patch("mcp_server.server._STATUS_PATH", tmp_path / "status.json"):
-        from mcp_server.server import get_scrape_status
         result = get_scrape_status()
 
     assert result["available"] is False
@@ -121,7 +119,6 @@ def test_get_scrape_status_returns_data(tmp_path):
         patch("mcp_server.server._STATUS_PATH", status_path),
         patch("mcp_server.server._LOG_PATH", tmp_path / "scraper.log"),
     ):
-        from mcp_server.server import get_scrape_status
         result = get_scrape_status()
 
     assert result["available"] is True
@@ -147,7 +144,6 @@ def test_get_scrape_status_includes_recent_logs(tmp_path):
         patch("mcp_server.server._STATUS_PATH", status_path),
         patch("mcp_server.server._LOG_PATH", log_path),
     ):
-        from mcp_server.server import get_scrape_status
         result = get_scrape_status()
 
     assert result["available"] is True
