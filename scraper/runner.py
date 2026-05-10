@@ -181,9 +181,7 @@ def _select_targets(config: AppConfig, requested: Iterable[str]) -> list[str]:
     return list(config.enabled_site_names())
 
 
-def _build_pairs(
-    config: AppConfig, sites: list[str], keywords: list[str]
-) -> list[tuple[str, str]]:
+def _build_pairs(sites: list[str], keywords: list[str]) -> list[tuple[str, str]]:
     return [(keyword, site) for keyword in keywords for site in sites]
 
 
@@ -216,7 +214,7 @@ def run(
         _LOG.error("[runner] no keywords to scrape")
         return 1
 
-    pairs = _build_pairs(config, selected, keyword_list)
+    pairs = _build_pairs(selected, keyword_list)
     fetcher = default_fetch_chain()
 
     def _process(pair: tuple[str, str]) -> None:
