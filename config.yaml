@@ -2,7 +2,7 @@ keywords:
   - software engineer
   - data analyst
 
-limit: 2
+limit: 5
 concurrency: 2
 output_dir: output
 
@@ -57,10 +57,12 @@ default_fields:
 sites:
   jobstreet:
     enabled: true
+    limit: 10
     url_template: "https://id.jobstreet.com/id/{keyword_slug}-jobs?daterange=1"
 
   glints:
     enabled: true
+    limit: 10
     url_template: "https://glints.com/id/opportunities/jobs/explore?keyword={keyword}&country=ID"
     fields:
       - title
@@ -76,6 +78,7 @@ sites:
 
   linkedin:
     enabled: true
+    limit: 5
     url_template: "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords={keyword}&location=Indonesia&f_TPR=r86400&start=0"
     fields:
       - title
@@ -88,4 +91,5 @@ sites:
 
   indeed:
     enabled: true
+    limit: 10
     url_template: "https://id.indeed.com/jobs?q={keyword_plus}&l=Indonesia&fromage=1"

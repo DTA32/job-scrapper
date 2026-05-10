@@ -40,6 +40,7 @@ class SiteConfig:
     fields: tuple[str, ...] | None = None
     max_age_hours: int | None = None
     filter: dict[str, list[str]] | None = None
+    limit: int | None = None
 
     def effective_fields(self, default: tuple[str, ...]) -> tuple[str, ...]:
         return self.fields if self.fields is not None else default
@@ -92,6 +93,12 @@ class AppConfig:
         if cfg is not None and cfg.filter is not None:
             return cfg.filter
         return self.filter
+
+    def limit_for(self, site_name: str) -> int:
+        cfg = self.site(site_name)
+        if cfg is not None and cfg.limit is not None:
+            return cfg.limit
+        return self.limit
 
 
 def _slugify(keyword: str) -> str:
@@ -288,6 +295,19 @@ def load(path: Path) -> AppConfig:
         if "filter" in cfg:
             site_filter = _validate_filter(cfg["filter"], f"sites.{name}.filter")
 
+        site_limit: int | None = None
+        if "limit" in cfg and cfg["limit"] is not None:
+            try:
+                site_limit = int(cfg["limit"])
+            except (TypeError, ValueError) as exc:
+                raise ConfigError(
+                    f"sites.{name}.limit must be an integer, got {cfg['limit']!r}"
+                ) from exc
+            if site_limit < 1:
+                raise ConfigError(
+                    f"sites.{name}.limit must be >= 1, got {site_limit}"
+                )
+
         sites.append(
             SiteConfig(
                 name=name,
@@ -296,6 +316,7 @@ def load(path: Path) -> AppConfig:
                 fields=site_fields,
                 max_age_hours=site_max_age,
                 filter=site_filter,
+                limit=site_limit,
             )
         )
 
