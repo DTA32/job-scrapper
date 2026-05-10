@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import sys
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import quote, urlparse
@@ -22,6 +21,7 @@ ALLOWED_URL_HOSTS: frozenset[str] = frozenset({
     "id.glints.com",
     "www.linkedin.com",
     "linkedin.com",
+    "id.linkedin.com",
     "id.indeed.com",
     "indeed.com",
     "www.indeed.com",
@@ -167,10 +167,10 @@ def _validate_fields(raw: object, source: str) -> tuple[str, ...]:
         if not isinstance(entry, str):
             raise ConfigError(f"{source} entries must be strings, got {entry!r}")
         if entry not in CANONICAL_FIELDS:
-            print(
-                f"[config] warning: {source} contains unknown field '{entry}'; "
-                f"will be ignored. allowed: {sorted(CANONICAL_FIELDS)}",
-                file=sys.stderr,
+            from .log import get_logger as _get_logger
+            _get_logger().warning(
+                "[config] %s contains unknown field '%s'; ignored. allowed: %s",
+                source, entry, sorted(CANONICAL_FIELDS),
             )
             continue
         cleaned.append(entry)
@@ -207,10 +207,10 @@ def _validate_filter(raw: object, source: str) -> dict[str, list[str]]:
         if not isinstance(key, str):
             raise ConfigError(f"{source} keys must be strings, got {key!r}")
         if key not in FILTERABLE_FIELDS:
-            print(
-                f"[config] warning: {source} contains unknown filter field "
-                f"'{key}'; will be ignored. allowed: {sorted(FILTERABLE_FIELDS)}",
-                file=sys.stderr,
+            from .log import get_logger as _get_logger
+            _get_logger().warning(
+                "[config] %s contains unknown filter field '%s'; ignored. allowed: %s",
+                source, key, sorted(FILTERABLE_FIELDS),
             )
             continue
         if value is None or value == "":

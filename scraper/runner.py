@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -16,10 +15,13 @@ from .fetchers import (
     FetchChain,
     PlaywrightFetcher,
 )
+from .log import get_logger
 from .sites import SCRAPERS, Scraper
 from .sites._dates import parse_to_iso
 from .sites._filter import apply_filter, project_jobs
 from .types import Job
+
+_LOG = get_logger()
 
 
 def default_fetch_chain() -> FetchChain:
@@ -70,10 +72,10 @@ def _fetch_requirements(
             return None
         if host not in ALLOWED_URL_HOSTS:
             return None
-        result = scraper.detail_fetch(url, fetcher)
+        result = fetcher.fetch(url)
         return scraper.parse_detail(result.html) if result.html else None
 
-    print(f"[{scraper.name}] fetching requirements for {len(jobs)} job(s)")
+    _LOG.info("[%s] fetching requirements for %d job(s)", scraper.name, len(jobs))
     with ThreadPoolExecutor(max_workers=min(4, len(jobs))) as ex:
         futures = {ex.submit(_fetch_one, job): i for i, job in enumerate(jobs)}
         for fut in as_completed(futures):
@@ -98,11 +100,11 @@ def run_one(
     json_path = output_dir / f"{scraper.name}.json"
     debug_path = output_dir / f"{scraper.name}.debug.html"
 
-    print(f"[{label}] fetching {scraper.url}")
+    _LOG.info("[%s] fetching %s", label, scraper.url)
     result = fetcher.fetch(scraper.url)
     html = result.html
     if not html:
-        print(f"[{label}] FAILED: no html", file=sys.stderr)
+        _LOG.error("[%s] FAILED: no html", label)
         json_path.write_text(
             json.dumps(
                 {
@@ -117,11 +119,11 @@ def run_one(
         return
 
     debug_path.write_text(html)
-    print(f"[{label}] saved raw html → {debug_path.name} ({len(html)} bytes)")
+    _LOG.info("[%s] saved raw html → %s (%d bytes)", label, debug_path.name, len(html))
 
     jobs = scraper.parse(html)
     parsed_count = len(jobs)
-    print(f"[{label}] parsed {parsed_count} job(s)")
+    _LOG.info("[%s] parsed %d job(s)", label, parsed_count)
 
     _enrich_jobs(jobs, keyword)
 
@@ -131,18 +133,26 @@ def run_one(
         before = len(jobs)
         jobs = [j for j in jobs if _within_max_age(j, cutoff)]
         dropped = before - len(jobs)
-        print(
-            f"[{label}] max_age={max_age_hours}h kept {len(jobs)}/{before} "
-            f"(dropped {dropped})"
+        _LOG.info(
+            "[%s] max_age=%dh kept %d/%d (dropped %d)",
+            label,
+            max_age_hours,
+            len(jobs),
+            before,
+            dropped,
         )
 
     if content_filter:
         before = len(jobs)
         jobs = apply_filter(jobs, content_filter)
         dropped = before - len(jobs)
-        print(
-            f"[{label}] filter={content_filter} kept {len(jobs)}/{before} "
-            f"(dropped {dropped})"
+        _LOG.info(
+            "[%s] filter=%s kept %d/%d (dropped %d)",
+            label,
+            content_filter,
+            len(jobs),
+            before,
+            dropped,
         )
 
     _fetch_requirements(jobs, fields, fetcher, scraper)
@@ -161,7 +171,7 @@ def run_one(
             indent=2,
         )
     )
-    print(f"[{label}] wrote {json_path.name}")
+    _LOG.info("[%s] wrote %s", label, json_path.name)
 
 
 def _select_targets(config: AppConfig, requested: Iterable[str]) -> list[str]:
@@ -189,24 +199,21 @@ def run(
 
     selected = _select_targets(config, targets)
     if not selected:
-        print(
-            "[runner] no sites selected (none enabled in config and no CLI args)",
-            file=sys.stderr,
-        )
+        _LOG.error("[runner] no sites selected (none enabled in config and no CLI args)")
         return 1
 
     unknown = [name for name in selected if name not in SCRAPERS]
     if unknown:
-        print(
-            f"[runner] unknown sites: {', '.join(unknown)}. "
-            f"available: {', '.join(SCRAPERS)}",
-            file=sys.stderr,
+        _LOG.error(
+            "[runner] unknown sites: %s. available: %s",
+            ", ".join(unknown),
+            ", ".join(SCRAPERS),
         )
         return 1
 
     keyword_list = list(keywords) if keywords else list(config.keywords)
     if not keyword_list:
-        print("[runner] no keywords to scrape", file=sys.stderr)
+        _LOG.error("[runner] no keywords to scrape")
         return 1
 
     pairs = _build_pairs(config, selected, keyword_list)
@@ -216,19 +223,15 @@ def run(
         keyword, name = pair
         site_cfg = config.site(name)
         if site_cfg is None:
-            print(
-                f"[runner] '{name}' has no entry in config.yaml; skipping",
-                file=sys.stderr,
-            )
+            _LOG.warning("[runner] '%s' has no entry in config.yaml; skipping", name)
             return
         scraper_cls = SCRAPERS[name]
         url = site_cfg.url_for(keyword)
         scraper = scraper_cls(url=url, limit=config.limit)
         keyword_dir = out / keyword_slug(keyword)
         if not keyword_dir.resolve().is_relative_to(out):
-            print(
-                f"[runner] keyword '{keyword}' slug escapes output_dir; skipping",
-                file=sys.stderr,
+            _LOG.warning(
+                "[runner] keyword '%s' slug escapes output_dir; skipping", keyword
             )
             return
         run_one(
@@ -247,10 +250,10 @@ def run(
             _process(pair)
         return 0
 
-    print(
-        f"[runner] running {len(pairs)} (keyword,site) pair(s) "
-        f"with concurrency={workers}",
-        file=sys.stderr,
+    _LOG.info(
+        "[runner] running %d (keyword,site) pair(s) with concurrency=%d",
+        len(pairs),
+        workers,
     )
     with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="scraper") as ex:
         futures = {ex.submit(_process, pair): pair for pair in pairs}
@@ -259,8 +262,7 @@ def run(
             try:
                 fut.result()
             except Exception as exc:
-                print(
-                    f"[{name}:{keyword_slug(keyword)}] thread error: {exc}",
-                    file=sys.stderr,
+                _LOG.error(
+                    "[%s:%s] thread error: %s", name, keyword_slug(keyword), exc
                 )
     return 0
