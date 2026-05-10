@@ -13,7 +13,13 @@ _LOG = get_logger()
 class CloudscraperFetcher:
     name = "cloudscraper"
 
+    def __init__(self, proxy: str | None = None) -> None:
+        self._proxy = proxy
+
     def fetch(self, url: str) -> tuple[str | None, FetchAttempt]:
+        if self._proxy:
+            _LOG.info("[cloudscraper] using proxy: %s", self._proxy)
+
         try:
             scraper = cloudscraper.create_scraper(  # type: ignore[attr-defined]
                 browser={"browser": "chrome", "platform": "linux", "mobile": False}
@@ -21,7 +27,8 @@ class CloudscraperFetcher:
             scraper.headers.update(
                 {"User-Agent": USER_AGENT, "Accept-Language": ACCEPT_LANGUAGE}
             )
-            response = scraper.get(url, timeout=30)
+            proxies = {"http": self._proxy, "https": self._proxy} if self._proxy else None
+            response = scraper.get(url, timeout=30, proxies=proxies)
         except Exception as exc:
             _LOG.error("[cloudscraper] error on %s: %s", url, exc)
             return None, FetchAttempt(

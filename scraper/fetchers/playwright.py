@@ -13,6 +13,9 @@ _LOG = get_logger()
 class PlaywrightFetcher:
     name = "playwright"
 
+    def __init__(self, proxy: str | None = None) -> None:
+        self._proxy = proxy
+
     def fetch(self, url: str) -> tuple[str | None, FetchAttempt]:
         try:
             from playwright.sync_api import sync_playwright  # type: ignore[import-untyped]
@@ -34,6 +37,9 @@ class PlaywrightFetcher:
             except Exception:
                 stealth_sync = None
 
+        if self._proxy:
+            _LOG.info("[playwright] using proxy: %s", self._proxy)
+
         try:
             with sync_playwright() as p:
                 browser = p.chromium.launch(
@@ -45,11 +51,14 @@ class PlaywrightFetcher:
                         "--disable-gpu",
                     ],
                 )
-                context = browser.new_context(
-                    user_agent=USER_AGENT,
-                    locale="id-ID",
-                    viewport={"width": 1366, "height": 768},
-                )
+                context_kwargs: dict = {
+                    "user_agent": USER_AGENT,
+                    "locale": "id-ID",
+                    "viewport": {"width": 1366, "height": 768},
+                }
+                if self._proxy:
+                    context_kwargs["proxy"] = {"server": self._proxy}
+                context = browser.new_context(**context_kwargs)
                 page = context.new_page()
                 if stealth_v2 is not None:
                     stealth_v2().apply_stealth_sync(page)

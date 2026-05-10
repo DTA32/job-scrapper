@@ -33,6 +33,11 @@ class ConfigError(ValueError):
 
 
 @dataclass(frozen=True)
+class ProxyConfig:
+    url: str
+
+
+@dataclass(frozen=True)
 class SiteConfig:
     name: str
     enabled: bool
@@ -59,6 +64,7 @@ class AppConfig:
     max_age_hours: int | None
     filter: dict[str, list[str]]
     sites: tuple[SiteConfig, ...]
+    proxy: ProxyConfig | None = None
 
     @property
     def keyword(self) -> str:
@@ -344,6 +350,11 @@ def load(path: Path) -> AppConfig:
 
     global_filter = _validate_filter(raw.get("filter"), "filter")
 
+    proxy: ProxyConfig | None = None
+    proxy_url = raw.get("proxy")
+    if isinstance(proxy_url, str) and proxy_url.strip():
+        proxy = ProxyConfig(url=proxy_url.strip())
+
     return AppConfig(
         keywords=keywords,
         limit=limit,
@@ -353,6 +364,7 @@ def load(path: Path) -> AppConfig:
         filter=global_filter,
         max_age_hours=max_age_hours,
         sites=tuple(sites),
+        proxy=proxy,
     )
 
 
