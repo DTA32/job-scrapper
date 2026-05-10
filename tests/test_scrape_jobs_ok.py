@@ -96,3 +96,28 @@ def test_ok_false_when_output_missing(mock_read, mock_load, mock_run):
     assert result["ok"] is False
     assert len(result["errors"]) == 1
     assert result["results"][0]["sites"] == []
+
+
+@patch("mcp_server.server._write_status")
+@patch("mcp_server.server.run_scraper", return_value=0)
+@patch("mcp_server.server._load_config")
+@patch("mcp_server.server._read_site_output")
+def test_scrape_jobs_writes_status(mock_read, mock_load, mock_run, mock_write_status):
+    """scrape_jobs must call _write_status exactly once after a run."""
+    mock_load.return_value = _make_config()
+    mock_read.return_value = {
+        "keyword": "data analyst",
+        "fields": ["title"],
+        "count": 1,
+        "jobs": [{"title": "A"}],
+        "max_age_hours": None,
+        "filter": None,
+    }
+
+    from mcp_server.server import scrape_jobs
+    scrape_jobs(keywords=["data analyst"], sites=["jobstreet"])
+
+    mock_write_status.assert_called_once()
+    result_arg, duration_arg = mock_write_status.call_args.args
+    assert result_arg["ok"] is True
+    assert isinstance(duration_arg, float)

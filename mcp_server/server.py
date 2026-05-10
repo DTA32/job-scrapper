@@ -308,9 +308,14 @@ def scrape_jobs(
                   - runtime_error     unexpected exception (detail = class+msg)
                   - not_installed     fetcher dependency missing
     """
+    log = _get_logger()
+    log.info("scrape_jobs called sites=%s keywords=%s", sites, keywords)
+    t_start = time.monotonic()
+
     try:
         config = _load_config(DEFAULT_CONFIG_PATH)
     except ConfigError as exc:
+        log.error("scrape_jobs config error: %s", exc)
         return {"error": str(exc)}
 
     target_sites = list(sites) if sites else list(config.enabled_site_names())
@@ -349,7 +354,10 @@ def scrape_jobs(
             per_site.append({"site": name, **payload})
         results.append({"keyword": keyword, "sites": per_site})
 
-    return {
+    total_jobs = sum(
+        s.get("count", 0) for r in results for s in r.get("sites", [])
+    )
+    result = {
         "ok": len(errors) == 0,
         "keywords": target_keywords,
         "requested_sites": target_sites,
@@ -357,6 +365,19 @@ def scrape_jobs(
         "results": results,
         "errors": errors,
     }
+
+    duration = time.monotonic() - t_start
+    log.info(
+        "scrape_jobs done ok=%s errors=%d jobs=%d duration=%.1fs",
+        result["ok"],
+        len(errors),
+        total_jobs,
+        duration,
+    )
+
+    _write_status(result, duration)
+
+    return result
 
 
 def main() -> None:
