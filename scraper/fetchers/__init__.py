@@ -9,6 +9,7 @@ from .base import (
     looks_like_challenge,
 )
 from .cloudscraper import CloudscraperFetcher
+from .curl_cffi import CurlCffiFetcher
 from .playwright import PlaywrightFetcher
 
 __all__ = [
@@ -17,6 +18,7 @@ __all__ = [
     "FetchAttempt",
     "Fetcher",
     "CloudscraperFetcher",
+    "CurlCffiFetcher",
     "PlaywrightFetcher",
     "detect_challenge",
     "looks_like_challenge",
