@@ -1,29 +1,40 @@
-# scraper/fetchers/cloudscraper.py
+# scraper/fetchers/curl_cffi.py
 from __future__ import annotations
-
-import cloudscraper
 
 from ..config import ACCEPT_LANGUAGE, USER_AGENT
 from ..log import get_logger
 from .base import FetchAttempt, detect_challenge
 
+CHROME_IMPERSONATE = "chrome131"
 _LOG = get_logger()
 
 
-class CloudscraperFetcher:
-    name = "cloudscraper"
+class CurlCffiFetcher:
+    name = "curl_cffi"
 
     def fetch(self, url: str) -> tuple[str | None, FetchAttempt]:
         try:
-            scraper = cloudscraper.create_scraper(  # type: ignore[attr-defined]
-                browser={"browser": "chrome", "platform": "linux", "mobile": False}
-            )
-            scraper.headers.update(
-                {"User-Agent": USER_AGENT, "Accept-Language": ACCEPT_LANGUAGE}
-            )
-            response = scraper.get(url, timeout=30)
+            from curl_cffi import requests as cffi_requests  # type: ignore[attr-defined]
         except Exception as exc:
-            _LOG.error("[cloudscraper] error on %s: %s", url, exc)
+            _LOG.warning("[curl_cffi] not installed: %s", exc)
+            return None, FetchAttempt(
+                fetcher=self.name,
+                code="not_installed",
+                detail=f"{type(exc).__name__}: {exc}",
+            )
+
+        try:
+            response = cffi_requests.get(
+                url,
+                impersonate=CHROME_IMPERSONATE,
+                headers={
+                    "User-Agent": USER_AGENT,
+                    "Accept-Language": ACCEPT_LANGUAGE,
+                },
+                timeout=30,
+            )
+        except Exception as exc:
+            _LOG.error("[curl_cffi] error on %s: %s", url, exc)
             return None, FetchAttempt(
                 fetcher=self.name,
                 code="runtime_error",
@@ -32,7 +43,7 @@ class CloudscraperFetcher:
 
         status = response.status_code
         if status != 200:
-            _LOG.warning("[cloudscraper] %s status=%d", url, status)
+            _LOG.warning("[curl_cffi] %s status=%d", url, status)
             return None, FetchAttempt(
                 fetcher=self.name,
                 code=f"http_{status}",
@@ -42,7 +53,7 @@ class CloudscraperFetcher:
         text = response.text
         challenge = detect_challenge(text)
         if challenge:
-            _LOG.warning("[cloudscraper] %s blocked by challenge page", url)
+            _LOG.warning("[curl_cffi] %s blocked by challenge page", url)
             return None, FetchAttempt(
                 fetcher=self.name,
                 code="challenge",

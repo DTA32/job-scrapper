@@ -88,6 +88,33 @@ def _employment_type_from_candidate(candidate: dict) -> str | None:
 class JobstreetScraper(Scraper):
     name = "jobstreet"
 
+    def parse_detail(self, html: str) -> str | None:
+        data = extract_next_data(html)
+        if data:
+            candidates: list[dict] = []
+            walk_dicts(
+                data,
+                lambda d: any(k in d for k in ("requirements", "jobDescription", "description")),
+                candidates,
+            )
+            for candidate in candidates:
+                for key in ("requirements", "jobDescription", "description"):
+                    value = candidate.get(key)
+                    if isinstance(value, str) and value.strip():
+                        return value.strip()
+        soup = BeautifulSoup(html, "lxml")
+        for selector in (
+            "[data-automation='jobAdDetails']",
+            "[data-automation='jobDescription']",
+            ".job-description",
+        ):
+            el = soup.select_one(selector)
+            if el:
+                text = el.get_text("\n", strip=True)
+                if text:
+                    return text
+        return None
+
     def parse(self, html: str) -> list[Job]:
         results: list[Job] = []
         results.extend(self._parse_next_data(html))

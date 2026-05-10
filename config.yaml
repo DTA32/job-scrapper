@@ -2,7 +2,7 @@ keywords:
   - software engineer
   - data analyst
 
-limit: 2
+limit: 5
 concurrency: 2
 output_dir: output
 
@@ -26,11 +26,13 @@ bot:
 
     Matched: {matched_keyword} on {site}
 
+    {requirements}
+
 # Drop jobs older than this many hours. Comment out / remove for no filter.
 # Per-site override available under sites.<name>.max_age_hours.
 # Pair this value with the URL templates below: jobstreet/indeed take a "1"
 # (days) and linkedin takes seconds (e.g. r86400 = 24h).
-max_age_hours: 24
+max_age_hours: 96
 
 # See docs/filters.md for allowed values and matching semantics.
 filter:
@@ -40,7 +42,7 @@ filter:
 
 # Fields included by default for every site (canonical names).
 # Allowed: title, company, url, location, salary, posted_date, posted_at,
-# work_type, employment_type, experience_level, job_id, matched_keyword.
+# work_type, employment_type, experience_level, job_id, requirements, matched_keyword.
 # site, matched_keyword, title, company, url are always included.
 default_fields:
   - title
@@ -50,14 +52,17 @@ default_fields:
   - salary
   - posted_date
   - posted_at
+  - requirements
 
 sites:
   jobstreet:
     enabled: true
+    limit: 10
     url_template: "https://id.jobstreet.com/id/{keyword_slug}-jobs?daterange=1"
 
   glints:
     enabled: true
+    limit: 10
     url_template: "https://glints.com/id/opportunities/jobs/explore?keyword={keyword}&country=ID"
     fields:
       - title
@@ -69,9 +74,11 @@ sites:
       - posted_at
       - work_type
       - experience_level
+      - requirements
 
   linkedin:
     enabled: true
+    limit: 5
     url_template: "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords={keyword}&location=Indonesia&f_TPR=r86400&start=0"
     fields:
       - title
@@ -80,7 +87,9 @@ sites:
       - url
       - posted_date
       - posted_at
+      - requirements
 
   indeed:
     enabled: true
+    limit: 10
     url_template: "https://id.indeed.com/jobs?q={keyword_plus}&l=Indonesia&fromage=1"

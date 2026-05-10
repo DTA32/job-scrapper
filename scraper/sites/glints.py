@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 
 from bs4 import BeautifulSoup
@@ -7,6 +8,43 @@ from bs4 import BeautifulSoup
 from ..types import Job, empty_job
 from ._next_data import extract_next_data, walk_dicts
 from .base import Scraper
+
+
+def _city_name_from_hierarchical(node: dict | None) -> str | None:
+    if not isinstance(node, dict):
+        return None
+    if node.get("administrativeLevelName") == "City":
+        name = node.get("formattedName") or node.get("name")
+        if isinstance(name, str) and name.strip():
+            return name.strip()
+    parents = node.get("parents")
+    if isinstance(parents, list):
+        for parent in parents:
+            if isinstance(parent, dict) and parent.get("administrativeLevelName") == "City":
+                name = parent.get("formattedName") or parent.get("name")
+                if isinstance(name, str) and name.strip():
+                    return name.strip()
+    return None
+
+
+def _description_from_jsonld(html: str) -> str | None:
+    soup = BeautifulSoup(html, "lxml")
+    for tag in soup.find_all("script", attrs={"type": "application/ld+json"}):
+        if not tag.string:
+            continue
+        try:
+            payload = json.loads(tag.string)
+        except json.JSONDecodeError:
+            continue
+        for entry in payload if isinstance(payload, list) else [payload]:
+            if not isinstance(entry, dict):
+                continue
+            if entry.get("@type") != "JobPosting":
+                continue
+            description = entry.get("description")
+            if isinstance(description, str) and description.strip():
+                return BeautifulSoup(description, "lxml").get_text("\n", strip=True)
+    return None
 
 
 def _company_from_candidate(candidate: dict) -> str | None:
@@ -19,6 +57,11 @@ def _company_from_candidate(candidate: dict) -> str | None:
 
 
 def _location_from_candidate(candidate: dict) -> str | None:
+    for key in ("city", "location"):
+        node = candidate.get(key)
+        city_name = _city_name_from_hierarchical(node)
+        if city_name:
+            return city_name
     if candidate.get("locationName"):
         return candidate["locationName"]
     if candidate.get("cityName"):
@@ -92,6 +135,32 @@ def _experience_level_from_candidate(candidate: dict) -> str | None:
 
 class GlintsScraper(Scraper):
     name = "glints"
+
+    def parse_detail(self, html: str) -> str | None:
+        jsonld_description = _description_from_jsonld(html)
+        if jsonld_description:
+            return jsonld_description
+        data = extract_next_data(html)
+        if data:
+            candidates: list[dict] = []
+            walk_dicts(
+                data,
+                lambda d: any(k in d for k in ("description", "requirements", "jobDescription")),
+                candidates,
+            )
+            for candidate in candidates:
+                for key in ("description", "requirements", "jobDescription"):
+                    value = candidate.get(key)
+                    if isinstance(value, str) and value.strip():
+                        return value.strip()
+        soup = BeautifulSoup(html, "lxml")
+        for selector in (".JobDescription", "[class*='description']", ".job-description"):
+            el = soup.select_one(selector)
+            if el:
+                text = el.get_text("\n", strip=True)
+                if text:
+                    return text
+        return None
 
     def parse(self, html: str) -> list[Job]:
         results: list[Job] = []
