@@ -27,7 +27,7 @@ scraper/                    # CLI + library
     └── indeed.py
 
 mcp_server/                 # MCP HTTP server
-├── server.py               # FastMCP, exposes list_sites/get_config/update_config/scrape_jobs
+├── server.py               # FastMCP, tools: list_sites, get_config, update_config, get_scrape_status, test_proxy_connection, scrape_jobs
 └── __init__.py             # (empty)
 ```
 

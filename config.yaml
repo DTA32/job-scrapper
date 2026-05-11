@@ -41,7 +41,7 @@ bot:
 # Per-site override available under sites.<name>.max_age_hours.
 # Pair this value with the URL templates below: jobstreet/indeed take a "1"
 # (days) and linkedin takes seconds (e.g. r86400 = 24h).
-max_age_hours: 24
+max_age_hours: 72
 
 # See docs/filters.md for allowed values and matching semantics.
 filter:
