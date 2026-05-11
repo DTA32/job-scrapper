@@ -9,15 +9,23 @@ from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse, urlunparse
 
 import yaml
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-untyped]
 
+from scraper.config import ACCEPT_LANGUAGE, USER_AGENT
 from scraper.config_loader import AppConfig, ConfigError, keyword_slug, load
 from scraper.log import get_logger as _get_logger
 from scraper.runner import run as run_scraper
 
 DEFAULT_CONFIG_PATH = Path(os.environ.get("SCRAPER_CONFIG", "config.yaml"))
+DEFAULT_PROXY_TEST_URL = os.environ.get(
+    "PROXY_TEST_URL",
+    "https://api.ipify.org?format=json",
+)
+PROXY_TEST_TIMEOUT_SEC = float(os.environ.get("PROXY_TEST_TIMEOUT_SEC", "25"))
+CHROME_IMPERSONATE = "chrome131"
 HOST = os.environ.get("MCP_HOST", "0.0.0.0")
 PORT = int(os.environ.get("MCP_PORT", "8080"))
 
@@ -58,6 +66,86 @@ def _atomic_write_yaml(path: Path, data: dict) -> None:
     tmp_path = path.with_suffix(path.suffix + ".tmp")
     tmp_path.write_text(serialized)
     tmp_path.replace(path)
+
+
+def _redact_proxy_url(proxy_url: str) -> str:
+    """Hide proxy password in logged/returned strings."""
+    try:
+        p = urlparse(proxy_url)
+        if not p.hostname:
+            return proxy_url
+        host = p.hostname
+        port = f":{p.port}" if p.port else ""
+        if p.username is not None and p.username != "":
+            netloc = f"{p.username}:***@{host}{port}"
+        elif p.password is not None:
+            netloc = f"***@{host}{port}"
+        else:
+            netloc = f"{host}{port}"
+        return urlunparse((p.scheme, netloc, p.path, p.params, p.query, p.fragment))
+    except Exception:
+        return "<unparseable proxy url>"
+
+
+def _probe_proxy_http(proxy_url: str, test_url: str) -> dict[str, Any]:
+    """GET test_url through proxy_url using curl_cffi (same stack as scraper fetchers)."""
+    try:
+        from curl_cffi import requests as cffi_requests  # type: ignore[attr-defined]
+    except Exception as exc:
+        return {
+            "ok": False,
+            "error": f"curl_cffi not available: {type(exc).__name__}: {exc}",
+        }
+
+    proxies = {"http": proxy_url, "https": proxy_url}
+    try:
+        response = cffi_requests.get(
+            test_url,
+            impersonate=CHROME_IMPERSONATE,
+            headers={
+                "User-Agent": USER_AGENT,
+                "Accept-Language": ACCEPT_LANGUAGE,
+            },
+            timeout=PROXY_TEST_TIMEOUT_SEC,
+            proxies=proxies,
+        )
+    except Exception as exc:
+        return {
+            "ok": False,
+            "error": f"{type(exc).__name__}: {exc}",
+        }
+
+    status = response.status_code
+    body = (response.text or "")[:512]
+    out: dict[str, Any] = {
+        "ok": status == 200,
+        "http_status": status,
+        "test_url": test_url,
+    }
+    if status != 200:
+        out["error"] = f"HTTP {status}"
+        out["response_excerpt"] = body
+        return out
+
+    egress_ip: str | None = None
+    ct = (response.headers.get("content-type") or "").lower()
+    if "json" in ct or body.strip().startswith("{"):
+        try:
+            data = json.loads(response.text)
+            if isinstance(data, dict):
+                if isinstance(data.get("ip"), str):
+                    egress_ip = data["ip"]
+                elif isinstance(data.get("origin"), str):
+                    egress_ip = data["origin"].split(",")[0].strip()
+        except json.JSONDecodeError:
+            pass
+    if egress_ip is None and body and len(body) < 64:
+        egress_ip = body.strip()
+
+    if egress_ip:
+        out["egress_ip"] = egress_ip
+    out["response_excerpt"] = body
+    return out
 
 
 def _write_status(result: dict[str, Any], duration: float) -> None:
@@ -263,6 +351,88 @@ def get_scrape_status() -> dict[str, Any]:
             pass
 
     return {"available": True, **status, "recent_logs": recent_logs}
+
+
+@mcp.tool()
+def test_proxy_connection(
+    proxy_url: str | None = None,
+    url: str | None = None,
+) -> dict[str, Any]:
+    """Check that an HTTP(S) request succeeds through the configured proxy.
+
+    Uses the same curl_cffi transport as the scraper fetchers (HTTP, HTTPS,
+    SOCKS5 URLs as supported by curl_cffi).
+
+    Args:
+        proxy_url: optional override; when omitted, uses ``proxy`` from
+            config.yaml. When config has no proxy and this is omitted, returns
+            an error.
+        url: optional URL to fetch (default: ``PROXY_TEST_URL`` env or
+            https://api.ipify.org?format=json). Must be http or https.
+
+    Returns:
+        On success: {ok: true, proxy_redacted, test_url, http_status, duration_ms,
+            egress_ip? , response_excerpt?}
+        On failure: {ok: false, proxy_redacted?, test_url?, error, ...}
+    """
+    log = _get_logger()
+    test_target = (url or "").strip() or DEFAULT_PROXY_TEST_URL
+
+    parsed_test = urlparse(test_target)
+    if parsed_test.scheme not in ("http", "https"):
+        return {
+            "ok": False,
+            "error": f"url must be http(s), got scheme={parsed_test.scheme!r}",
+        }
+
+    resolved_proxy = (proxy_url or "").strip()
+    used_config_proxy = False
+    if not resolved_proxy:
+        try:
+            config = _load_config(DEFAULT_CONFIG_PATH)
+        except ConfigError as exc:
+            log.warning("test_proxy_connection config error: %s", exc)
+            return {"ok": False, "error": str(exc)}
+        if not config.proxy:
+            return {
+                "ok": False,
+                "error": (
+                    "no proxy in config.yaml and proxy_url not passed — "
+                    "set proxy or pass proxy_url"
+                ),
+            }
+        resolved_proxy = config.proxy.url
+        used_config_proxy = True
+
+    redacted = _redact_proxy_url(resolved_proxy)
+    log.info(
+        "test_proxy_connection proxy=%s test_url=%s",
+        redacted,
+        test_target,
+    )
+
+    t0 = time.monotonic()
+    probe = _probe_proxy_http(resolved_proxy, test_target)
+    duration_ms = round((time.monotonic() - t0) * 1000, 2)
+
+    base: dict[str, Any] = {
+        "proxy_redacted": redacted,
+        "test_url": test_target,
+        "duration_ms": duration_ms,
+    }
+    if used_config_proxy:
+        base["source"] = "config"
+
+    merged = {**base, **probe}
+    if merged.get("ok"):
+        log.info(
+            "test_proxy_connection ok duration_ms=%s egress_ip=%s",
+            duration_ms,
+            merged.get("egress_ip"),
+        )
+    else:
+        log.warning("test_proxy_connection failed: %s", merged.get("error"))
+    return merged
 
 
 @mcp.tool()

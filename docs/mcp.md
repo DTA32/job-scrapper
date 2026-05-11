@@ -21,6 +21,8 @@ Environment variables:
 | `MCP_HOST`        | `0.0.0.0`     | Bind address                            |
 | `MCP_PORT`        | `8080`        | Bind port                               |
 | `SCRAPER_CONFIG`  | `config.yaml` | Path to YAML config (relative or abs)   |
+| `PROXY_TEST_URL`  | `https://api.ipify.org?format=json` | URL `test_proxy_connection` fetches by default |
+| `PROXY_TEST_TIMEOUT_SEC` | `25` | Per-request timeout for that probe |
 
 ## Registering from a client Claude session
 
@@ -186,6 +188,45 @@ services:
 
 If the config mount is read-only, `update_config` returns
 `{ok: false, error: "write failed: ..."}`.
+
+### `test_proxy_connection`
+
+Read-only network probe. Performs one HTTPS GET through the proxy using the
+same curl_cffi stack as the scraper fetchers (so HTTP, HTTPS, and SOCKS5 proxy
+URLs work the same as in `config.yaml`).
+
+**Args** (all optional):
+
+```json
+{
+  "proxy_url": "socks5://127.0.0.1:1080",
+  "url": "https://api.ipify.org?format=json"
+}
+```
+
+- `proxy_url`: when omitted, uses the top-level `proxy` string from
+  `config.yaml`. If both are missing, returns `{ok: false, error: ...}`.
+- `url`: target URL to fetch (must be `http` or `https`). Default comes from
+  `PROXY_TEST_URL` or ipify as in the env table above.
+
+**Returns** (success example):
+
+```json
+{
+  "ok": true,
+  "proxy_redacted": "user:***@proxy.example.com:1080",
+  "source": "config",
+  "test_url": "https://api.ipify.org?format=json",
+  "duration_ms": 842.5,
+  "http_status": 200,
+  "egress_ip": "203.0.113.1",
+  "response_excerpt": "{\"ip\":\"203.0.113.1\"}"
+}
+```
+
+`proxy_redacted` masks proxy passwords. `source` is present only when the
+proxy URL came from config. On failure, `ok` is false and `error` describes
+validation, connection, or non-200 HTTP.
 
 The `docs:/app/docs:ro` mount makes the markdown reference docs (this file,
 `runbook.md`, `configuration.md`, `sites.md`, etc.) live-readable from inside
