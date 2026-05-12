@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
+from scraper.types import JOB_FIELD_ORDER
+
 
 def _make_config(keyword: str = "data analyst", site: str = "jobstreet"):
     cfg = MagicMock()
@@ -121,3 +123,56 @@ def test_scrape_jobs_writes_status(mock_read, mock_load, mock_run, mock_write_st
     result_arg, duration_arg = mock_write_status.call_args.args
     assert result_arg["ok"] is True
     assert isinstance(duration_arg, float)
+
+
+@patch("mcp_server.server.run_scraper", return_value=0)
+@patch("mcp_server.server._load_config")
+@patch("mcp_server.server._read_site_output")
+def test_scrape_jobs_normalizes_jobs_to_canonical_schema(
+    mock_read, mock_load, mock_run
+):
+    mock_load.return_value = _make_config()
+    mock_read.return_value = {
+        "keyword": "data analyst",
+        "fields": ["title", "company", "url"],
+        "count": 1,
+        "jobs": [
+            {
+                "title": "Data Analyst",
+                "company": "ACME",
+                "url": "https://example.com/job/1",
+                "extra": "drop-me",
+            }
+        ],
+        "max_age_hours": 24,
+        "filter": None,
+    }
+
+    from mcp_server.server import scrape_jobs
+
+    result = scrape_jobs(keywords=["data analyst"], sites=["jobstreet"])
+    site_entry = result["results"][0]["sites"][0]
+    job = site_entry["jobs"][0]
+
+    assert set(job.keys()) == set(JOB_FIELD_ORDER)
+    assert job["site"] == "jobstreet"
+    assert job["matched_keyword"] == "data analyst"
+    assert "extra" not in job
+    assert site_entry["count"] == 1
+
+
+def test_get_scrape_response_structure_exposes_canonical_fields():
+    from mcp_server.server import get_scrape_response_structure
+
+    out = get_scrape_response_structure()
+
+    assert out["tool"] == "scrape_jobs"
+    assert out["job_fields"] == list(JOB_FIELD_ORDER)
+    assert out["top_level_fields"] == [
+        "ok",
+        "keywords",
+        "requested_sites",
+        "exit_code",
+        "results",
+        "errors",
+    ]
