@@ -18,6 +18,7 @@ from scraper.config import ACCEPT_LANGUAGE, USER_AGENT
 from scraper.config_loader import AppConfig, ConfigError, keyword_slug, load
 from scraper.log import get_logger as _get_logger
 from scraper.runner import run as run_scraper
+from scraper.types import JOB_FIELD_ORDER
 
 DEFAULT_CONFIG_PATH = Path(os.environ.get("SCRAPER_CONFIG", "config.yaml"))
 DEFAULT_PROXY_TEST_URL = os.environ.get(
@@ -210,6 +211,51 @@ def _write_status(result: dict[str, Any], duration: float) -> None:
     _STATUS_PATH.write_text(json.dumps(status, indent=2))
 
 
+def _normalize_job_payload(
+    raw_job: Any, site_name: str, keyword: str
+) -> dict[str, Any]:
+    source = raw_job if isinstance(raw_job, dict) else {}
+    normalized = {field: source.get(field) for field in JOB_FIELD_ORDER}
+    normalized["site"] = source.get("site") or site_name
+    normalized["matched_keyword"] = source.get("matched_keyword") or keyword
+    return normalized
+
+
+def _normalize_site_payload(
+    payload: dict[str, Any], site_name: str, keyword: str
+) -> dict[str, Any]:
+    raw_jobs = payload.get("jobs")
+    jobs = raw_jobs if isinstance(raw_jobs, list) else []
+    normalized_jobs = [
+        _normalize_job_payload(job, site_name=site_name, keyword=keyword)
+        for job in jobs
+    ]
+
+    raw_fields = payload.get("fields")
+    fields = [
+        field
+        for field in raw_fields
+        if isinstance(field, str) and field in JOB_FIELD_ORDER
+    ] if isinstance(raw_fields, list) else []
+    if not fields:
+        fields = list(JOB_FIELD_ORDER)
+
+    max_age_hours = payload.get("max_age_hours")
+    normalized_max_age = max_age_hours if isinstance(max_age_hours, int) else None
+    content_filter = payload.get("filter")
+    normalized_filter = content_filter if isinstance(content_filter, dict) else None
+
+    return {
+        "site": site_name,
+        "keyword": keyword,
+        "fields": fields,
+        "max_age_hours": normalized_max_age,
+        "filter": normalized_filter,
+        "count": len(normalized_jobs),
+        "jobs": normalized_jobs,
+    }
+
+
 @mcp.tool()
 def list_sites() -> dict[str, Any]:
     """List sites declared in config.yaml with their enabled status.
@@ -253,6 +299,64 @@ def get_config() -> dict[str, Any]:
     except yaml.YAMLError as exc:
         return {"error": f"invalid YAML: {exc}"}
     return raw if isinstance(raw, dict) else {}
+
+
+@mcp.tool()
+def get_scrape_response_structure() -> dict[str, Any]:
+    """Return canonical schema and example payload for scrape_jobs response."""
+    sample_job = {field: None for field in JOB_FIELD_ORDER}
+    sample_job["site"] = "jobstreet"
+    sample_job["matched_keyword"] = "data analyst"
+    sample_job["title"] = "Data Analyst"
+    sample_job["company"] = "ACME"
+    sample_job["url"] = "https://id.jobstreet.com/job/123"
+
+    return {
+        "tool": "scrape_jobs",
+        "version": "1.0.0",
+        "job_fields": list(JOB_FIELD_ORDER),
+        "top_level_fields": [
+            "ok",
+            "keywords",
+            "requested_sites",
+            "exit_code",
+            "results",
+            "errors",
+        ],
+        "site_result_fields": [
+            "site",
+            "keyword",
+            "fields",
+            "max_age_hours",
+            "filter",
+            "count",
+            "jobs",
+        ],
+        "error_fields": ["keyword", "site", "reason", "attempts"],
+        "sample": {
+            "ok": True,
+            "keywords": ["data analyst"],
+            "requested_sites": ["jobstreet"],
+            "exit_code": 0,
+            "results": [
+                {
+                    "keyword": "data analyst",
+                    "sites": [
+                        {
+                            "site": "jobstreet",
+                            "keyword": "data analyst",
+                            "fields": list(JOB_FIELD_ORDER),
+                            "max_age_hours": 24,
+                            "filter": {"location": ["jakarta"]},
+                            "count": 1,
+                            "jobs": [sample_job],
+                        }
+                    ],
+                }
+            ],
+            "errors": [],
+        },
+    }
 
 
 @mcp.tool()
@@ -463,7 +567,7 @@ def scrape_jobs(
                 {keyword, sites: [{site, fields, count, jobs, ...}]}.
                 A site entry is absent from this list when its fetch failed
                 (see errors). Each job is projected to the fields configured
-                for that site and stamped with `matched_keyword`. Canonical
+                for that site and normalized to canonical schema. Canonical
                 fields: site, matched_keyword, title, company, url, location,
                 salary, posted_date, posted_at, work_type, employment_type,
                 experience_level, job_id, requirements. Fields a site cannot
@@ -521,7 +625,10 @@ def scrape_jobs(
                     err["attempts"] = attempts
                 errors.append(err)
                 continue
-            per_site.append({"site": name, **payload})
+            normalized_site = _normalize_site_payload(
+                payload=payload, site_name=name, keyword=keyword
+            )
+            per_site.append(normalized_site)
         results.append({"keyword": keyword, "sites": per_site})
 
     total_jobs = sum(

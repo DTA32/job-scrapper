@@ -20,23 +20,25 @@ class Job(TypedDict):
     requirements: str | None
 
 
+JOB_FIELD_ORDER: tuple[str, ...] = (
+    "site",
+    "matched_keyword",
+    "title",
+    "company",
+    "url",
+    "location",
+    "salary",
+    "posted_date",
+    "posted_at",
+    "work_type",
+    "employment_type",
+    "experience_level",
+    "job_id",
+    "requirements",
+)
+
 CANONICAL_FIELDS: frozenset[str] = frozenset(
-    {
-        "site",
-        "matched_keyword",
-        "title",
-        "company",
-        "url",
-        "location",
-        "salary",
-        "posted_date",
-        "posted_at",
-        "work_type",
-        "employment_type",
-        "experience_level",
-        "job_id",
-        "requirements",
-    }
+    JOB_FIELD_ORDER
 )
 
 MANDATORY_FIELDS: frozenset[str] = frozenset(

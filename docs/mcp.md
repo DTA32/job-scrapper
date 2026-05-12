@@ -93,6 +93,28 @@ Read-only. Returns the parsed `config.yaml` contents.
 Always call `get_config` before `update_config` to know the current shape so
 your patch is minimal.
 
+### `get_scrape_response_structure`
+
+Read-only. Returns canonical response contract for `scrape_jobs`.
+
+**Args**: none.
+
+**Returns**:
+
+```json
+{
+  "tool": "scrape_jobs",
+  "version": "1.0.0",
+  "job_fields": ["site", "matched_keyword", "title", "..."],
+  "top_level_fields": ["ok", "keywords", "requested_sites", "exit_code", "results", "errors"],
+  "site_result_fields": ["site", "keyword", "fields", "max_age_hours", "filter", "count", "jobs"],
+  "error_fields": ["keyword", "site", "reason", "attempts"],
+  "sample": { "...": "example payload" }
+}
+```
+
+Use this when you need strict output formatting in downstream automations.
+
 ### `update_config`
 
 Write. Deep-merges a patch into `config.yaml`, validates, writes atomically,
