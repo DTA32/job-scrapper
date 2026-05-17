@@ -5,6 +5,8 @@ keywords:
   - product owner
   - quality assurance
   - data analyst
+  - content writer
+  - seo
 
 limit: 5
 concurrency: 2
@@ -45,9 +47,9 @@ max_age_hours: 72
 
 # See docs/filters.md for allowed values and matching semantics.
 filter:
-  location: [jakarta, tangerang, bandung, bekasi]
-  employment_type: [full-time, internship, contract, part-time]
-  work_type: [remote, hybrid, onsite]
+  # location: [jakarta, tangerang, bandung, bekasi]
+  # employment_type: [full-time, internship, contract, part-time]
+  # work_type: [remote, hybrid, onsite]
 
 # Fields included by default for every site (canonical names).
 # Allowed: title, company, url, location, salary, posted_date, posted_at,
@@ -87,7 +89,7 @@ sites:
 
   linkedin:
     enabled: true
-    limit: 5
+    limit: 10
     url_template: "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords={keyword}&location=Indonesia&f_TPR=r86400&start=0"
     fields:
       - title
