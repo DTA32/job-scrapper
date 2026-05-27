@@ -54,6 +54,17 @@ field. If a referenced field is null/missing, drop the line containing
 that placeholder rather than emitting a literal `null`. Anchors
 (`title`, `company`, `url`) are always present.
 
+**Handling `{posted_date}`**: Reformat ISO dates (`YYYY-MM-DD`) to `Weekday, DD Month YYYY` (e.g. `2026-05-26` → `Tuesday, 26 May 2026`). Leave non-ISO values unchanged.
+
+**Handling `{requirements}`**: The raw value may contain mixed sections
+(duties, qualifications, benefits). Extract only candidate-facing items —
+things the candidate must have, know, or be. Common section headings to
+keep: "What We're Looking For", "Requirements", "Qualifications", "We Need".
+Strip sections describing job duties ("What You'll Do", "Responsibilities")
+and benefits ("What You'll Gain", "Perks"). Format the extracted items as a
+bullet list, one item per line, prefixed with `•`. If no clear qualification
+section exists, use the full value as-is.
+
 If the per-site result has `count: 0`, skip silently (don't post a
 "no jobs found" message — too noisy).
 
