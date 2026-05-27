@@ -1,13 +1,15 @@
 services:
+  # SERVICE: output-init — fixes output dir ownership before scraper runs (Playwright image runs as root)
   output-init:
     image: mcr.microsoft.com/playwright/python:v1.59.0-jammy
     container_name: job-scraper-init
     user: "0:0"
     entrypoint: ["sh", "-c", "chown -R 1000:1000 /out"]
+    restart: "no"
     volumes:
       - ./output:/out
-    restart: "no"
 
+  # SERVICE: scraper — one-shot CLI scraper; network_mode:host for SOCKS5 proxy passthrough
   scraper:
     build:
       context: .
@@ -16,6 +18,7 @@ services:
     image: job-scraper:latest
     container_name: job-scraper
     restart: "no"
+    profiles: ["scraper"]
     network_mode: host
     depends_on:
       output-init:
@@ -26,6 +29,7 @@ services:
     environment:
       - PROXY_URL=${PROXY_URL:-}
 
+  # SERVICE: scraper-mcp — long-running MCP HTTP server; profile-gated so `docker compose up` skips it by default
   scraper-mcp:
     build:
       context: .
@@ -44,3 +48,27 @@ services:
       - ./config.yaml:/app/config.yaml
       - ./output:/app/output
       - ./docs:/app/docs:ro
+
+  # SERVICE: bot — cron bot; runs claude-code on a schedule; profile-gated so `docker compose up` skips it by default
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: bot
+    image: job-scraper-bot:latest
+    container_name: job-scraper-bot
+    restart: unless-stopped
+    profiles: ["bot"]
+    extra_hosts:
+      - "host.docker.internal:host-gateway" # allows bot to reach scraper-mcp via host.docker.internal:8080 (Linux only)
+    depends_on:
+      output-init:
+        condition: service_completed_successfully
+    environment:
+      - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
+      - DISCORD_CHANNEL_ID=${DISCORD_CHANNEL_ID}
+    volumes:
+      - ~/.claude:/home/node/.claude
+      - ~/.claude.json:/home/node/.claude.json
+      - ./config.yaml:/workspace/config.yaml:ro
+      - ./output:/workspace/output
