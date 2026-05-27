@@ -10,7 +10,7 @@ claude --dangerously-skip-permissions -p "$(cat "$PROMPT")" 2>&1 | tee -a "$LOG"
 EXIT_CODE=${PIPESTATUS[0]}
 
 if [ "$EXIT_CODE" -ne 0 ]; then
-  echo "[$(date)] ERROR: claude exited with code $EXIT_CODE (possible MCP connection failure)" | tee -a "$LOG" >&2
+  echo "[$(date)] ERROR: claude exited with code $EXIT_CODE" | tee -a "$LOG" >&2
 fi
 
 echo "[$(date)] run complete." | tee -a "$LOG"
