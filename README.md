@@ -97,6 +97,7 @@ writes, and keeps a timestamped backup. See [`docs/mcp.md`](docs/mcp.md).
 - [`docs/architecture.md`](docs/architecture.md) — package map and request flow
 - [`docs/orchestration.md`](docs/orchestration.md) — cron + Claude + Discord automated flow
 - [`docs/deploy.md`](docs/deploy.md) — GitHub Actions deploy pipeline
+- [`docs/bot-mcp-communication.md`](docs/bot-mcp-communication.md) - deep bot<->MCP communication, scheduler flow, and proxy behavior
 
 ## Project layout
 
