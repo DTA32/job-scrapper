@@ -1,60 +1,44 @@
 keywords:
   - software engineer
   - back end engineer
-  - project manager
-  - product owner
-  - quality assurance
+  # - project manager
+  # - product owner
+  # - quality assurance
   - data analyst
   - content writer
   - seo
 
-limit: 5
+limit: 3
 concurrency: 2
 output_dir: output
 
-# Proxy configuration for residential IP routing
-# Format: "socks5://localhost:1080" or "http://proxy.example.com:8080"
-# Comment out to disable proxy and use direct connection
+# socks5://host:port or http://host:port — comment out for direct connection
 proxy: "socks5://localhost:1080"
 
-# Bot-side settings. Read by the scraper-bot image (cron + Discord posting).
-# Change here, push, redeploy.
 bot:
-  # Supercronic schedule (5-field cron OR @every / @daily / @hourly).
-  # Evaluated in the container's timezone — set TZ env on the bot container
-  # to control (workflow defaults to Asia/Jakarta).
   schedule: "0 10 * * *"
-
-  # Max characters per Discord message. Discord allows 2000; keep margin.
   max_chars: 1900
-
-  # Per-job Discord message template. Bot interpolates {field} placeholders
-  # against each job's canonical fields. Skip lines whose value is null.
   message_template: |
     ## {title}
-    {company} | {location} | {posted_date}
-    [link]({url})
+    {company} | {location}
 
-    Matched: {matched_keyword} on {site}
+    **Details**
+    Link: [link]({url})
+    Source: {site}
+    Diposting: {posted_date}
 
+    **Requirements**:
     {requirements}
 
-# Drop jobs older than this many hours. Comment out / remove for no filter.
-# Per-site override available under sites.<name>.max_age_hours.
-# Pair this value with the URL templates below: jobstreet/indeed take a "1"
-# (days) and linkedin takes seconds (e.g. r86400 = 24h).
+# jobs older than this are dropped; pair with URL param windows per site
 max_age_hours: 72
 
-# See docs/filters.md for allowed values and matching semantics.
 filter:
-  # location: [jakarta, tangerang, bandung, bekasi]
+  location: [jakarta, tangerang, bandung, bekasi]
   # employment_type: [full-time, internship, contract, part-time]
   # work_type: [remote, hybrid, onsite]
 
-# Fields included by default for every site (canonical names).
-# Allowed: title, company, url, location, salary, posted_date, posted_at,
-# work_type, employment_type, experience_level, job_id, requirements, matched_keyword.
-# site, matched_keyword, title, company, url are always included.
+# anchors (site, matched_keyword, title, company, url) always included
 default_fields:
   - title
   - company
@@ -68,12 +52,12 @@ default_fields:
 sites:
   jobstreet:
     enabled: true
-    limit: 10
+    limit: 3
     url_template: "https://id.jobstreet.com/id/{keyword_slug}-jobs?daterange=1"
 
   glints:
     enabled: true
-    limit: 10
+    limit: 3
     url_template: "https://glints.com/id/opportunities/jobs/explore?keyword={keyword}&country=ID"
     fields:
       - title
@@ -89,7 +73,7 @@ sites:
 
   linkedin:
     enabled: true
-    limit: 10
+    limit: 3
     url_template: "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords={keyword}&location=Indonesia&f_TPR=r86400&start=0"
     fields:
       - title
@@ -102,5 +86,5 @@ sites:
 
   indeed:
     enabled: true
-    limit: 10
+    limit: 3
     url_template: "https://id.indeed.com/jobs?q={keyword_plus}&l=Indonesia&fromage=1"
