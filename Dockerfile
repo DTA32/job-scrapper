@@ -1,5 +1,9 @@
 ARG PLAYWRIGHT_VERSION=v1.59.0-jammy
 
+
+# =============================================================================
+# STAGE: builder — install deps into --user dir so they can be copied without root
+# =============================================================================
 FROM mcr.microsoft.com/playwright/python:${PLAYWRIGHT_VERSION} AS builder
 
 WORKDIR /build
@@ -10,6 +14,9 @@ RUN pip install --no-cache-dir --upgrade pip \
  && pip install --no-cache-dir --user -r requirements.txt
 
 
+# =============================================================================
+# STAGE: runtime-base — shared base: copy deps from builder, create /app, drop to pwuser
+# =============================================================================
 FROM mcr.microsoft.com/playwright/python:${PLAYWRIGHT_VERSION} AS runtime-base
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -24,18 +31,24 @@ COPY --from=builder --chown=pwuser:pwuser /root/.local /home/pwuser/.local
 
 WORKDIR /app
 
-COPY --chown=pwuser:pwuser scraper ./scraper
+COPY --chown=pwuser:pwuser scraper     ./scraper
 COPY --chown=pwuser:pwuser config.yaml ./config.yaml
 
 USER pwuser
 
 
+# =============================================================================
+# STAGE: scraper-cli — one-shot CLI scraper
+# =============================================================================
 FROM runtime-base AS scraper-cli
 
 ENTRYPOINT ["python", "-m", "scraper"]
 CMD []
 
 
+# =============================================================================
+# STAGE: mcp-server — adds mcp_server package, exposes HTTP on 8080
+# =============================================================================
 FROM runtime-base AS mcp-server
 
 USER root
@@ -51,6 +64,9 @@ ENTRYPOINT ["python", "-m", "mcp_server.server"]
 CMD []
 
 
+# =============================================================================
+# STAGE: bot — node + claude-code + supercronic; runs scheduled scrapes via claude
+# =============================================================================
 FROM node:20-slim AS bot
 
 ARG SUPERCRONIC_URL=https://github.com/aptible/supercronic/releases/latest/download/supercronic-linux-amd64
@@ -69,9 +85,9 @@ RUN npm install -g @anthropic-ai/claude-code
 
 WORKDIR /workspace/scraper-bot
 
-COPY --chown=node:node config.yaml /workspace/config.yaml
-COPY --chown=node:node cron ./cron
-COPY --chown=node:node prompts ./prompts
+COPY --chown=node:node config.yaml            /workspace/config.yaml
+COPY --chown=node:node cron                   ./cron
+COPY --chown=node:node prompts                ./prompts
 COPY --chown=node:node claude/mcp.json.example ./.mcp.json
 
 RUN SCHEDULE="$(yq -r '.bot.schedule // "0 1 * * *"' /workspace/config.yaml)" \
