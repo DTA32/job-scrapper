@@ -16,7 +16,7 @@ output_dir: output
 proxy: "socks5://localhost:1080"
 
 bot:
-  schedule: "0 14 * * *"
+  schedule: "0 15 * * *"
   max_chars: 1900
   message_template: |
     ## {title}
