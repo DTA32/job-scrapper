@@ -90,7 +90,7 @@ COPY --chown=node:node cron                   ./cron
 COPY --chown=node:node prompts                ./prompts
 COPY --chown=node:node claude/mcp.json.example ./.mcp.json
 
-RUN SCHEDULE="$(yq -r '.bot.schedule // "0 1 * * *"' /workspace/config.yaml)" \
+RUN SCHEDULE="$(yq -r '.bot.schedule' /workspace/config.yaml)" \
  && echo "Generated cron schedule: $SCHEDULE" \
  && printf '%s /bin/sh /workspace/scraper-bot/cron/run-scraper.sh\n' "$SCHEDULE" \
     > cron/scraper-crontab \
