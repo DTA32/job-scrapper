@@ -1,0 +1,6 @@
+services:
+
+  # override: route proxy through host machine
+  scraper-mcp:
+    environment:
+      - PROXY_URL=socks5://host.docker.internal:1080

@@ -1,0 +1,4 @@
+# Dev overrides — merged on top of config.yaml by run_dev.sh
+# Only include keys that differ from the base config.
+
+proxy: ~  # disabled in dev — use direct connection
