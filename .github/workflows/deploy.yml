@@ -19,8 +19,11 @@ jobs:
       - name: Set image tags
         id: tags
         run: |
+          # ghcr.io requires lowercase; github.repository may contain uppercase chars
           REPO_LOWER=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')
+          # rolling tag — always points to the newest build
           echo "latest=ghcr.io/${REPO_LOWER}:mcp-latest" >> "$GITHUB_OUTPUT"
+          # immutable tag pinned to this exact commit, used for deployment
           echo "sha=ghcr.io/${REPO_LOWER}:mcp-${{ github.sha }}" >> "$GITHUB_OUTPUT"
 
       - name: Login to ghcr.io
@@ -58,8 +61,11 @@ jobs:
       - name: Set image tags
         id: tags
         run: |
+          # ghcr.io requires lowercase; github.repository may contain uppercase chars
           REPO_LOWER=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')
+          # rolling tag — always points to the newest build
           echo "latest=ghcr.io/${REPO_LOWER}:bot-latest" >> "$GITHUB_OUTPUT"
+          # immutable tag pinned to this exact commit, used for deployment
           echo "sha=ghcr.io/${REPO_LOWER}:bot-${{ github.sha }}" >> "$GITHUB_OUTPUT"
 
       - name: Login to ghcr.io
@@ -96,17 +102,25 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           envs: IMAGE_TAG,CONTAINER_NAME
           script: |
+            # fail fast: exit on error, unset vars, or pipe failure
             set -euo pipefail
+
+            # pull the newly-built image before touching the running container
             docker pull "$IMAGE_TAG"
+
+            # tear down the old container so the new one can take its place
             docker stop "$CONTAINER_NAME" || true
             docker rm "$CONTAINER_NAME" || true
 
+            # safety net: kill any container still holding port 8080 under a different name
             STALE=$(docker ps --filter "publish=8080" --format "{{.ID}}")
             if [ -n "$STALE" ]; then
               echo "Removing stale container(s) on port 8080: $STALE"
               echo "$STALE" | xargs -r docker rm -f
             fi
 
+            # --network host + -p 8080:8080: exposes the MCP HTTP server to the host
+            # PROXY_URL is optional; defaults to empty if the secret is unset
             docker run -d \
               --name "$CONTAINER_NAME" \
               --network host \
@@ -114,6 +128,8 @@ jobs:
               -p 8080:8080 \
               -e PROXY_URL="${PROXY_URL:-}" \
               "$IMAGE_TAG"
+
+            # confirm the container came up
             docker ps --filter "name=$CONTAINER_NAME"
         env:
           IMAGE_TAG: ${{ needs.build-mcp.outputs.image_tag_sha }}
@@ -131,10 +147,18 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           envs: IMAGE_TAG,CONTAINER_NAME,CLAUDE_CONFIG_DIR,CLAUDE_CONFIG_FILE,DISCORD_BOT_TOKEN,DISCORD_CHANNEL_ID,TZ
           script: |
+            # fail fast: exit on error, unset vars, or pipe failure
             set -euo pipefail
+
+            # pull the newly-built image before touching the running container
             docker pull "$IMAGE_TAG"
+
+            # tear down the old container so the new one can take its place
             docker stop "$CONTAINER_NAME" || true
             docker rm "$CONTAINER_NAME" || true
+
+            # --add-host: lets the container reach host-side services (MCP server on localhost:8080)
+            # -v mounts: Claude credentials and config come from the host so they survive redeploys
             docker run -d \
               --name "$CONTAINER_NAME" \
               --restart unless-stopped \
@@ -145,6 +169,8 @@ jobs:
               -e DISCORD_CHANNEL_ID="$DISCORD_CHANNEL_ID" \
               -e TZ="$TZ" \
               "$IMAGE_TAG"
+
+            # confirm the container came up
             docker ps --filter "name=$CONTAINER_NAME"
         env:
           IMAGE_TAG: ${{ needs.build-bot.outputs.image_tag_sha }}

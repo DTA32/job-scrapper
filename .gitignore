@@ -69,6 +69,14 @@ test-results/
 # Added by code-review-graph
 .code-review-graph/
 
+# Graphify artifacts
+.graphify_python
+graphify-out/
+
+# Local docs
+docs/bot-mcp-communication.md
+docs/workflow.excalidraw
+
 # Agent
 .claude/
 CLAUDE.md
