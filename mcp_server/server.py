@@ -15,6 +15,7 @@ from urllib.parse import urlparse, urlunparse
 import yaml
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-untyped]
 
+from mcp_server import mongo
 from scraper.config import ACCEPT_LANGUAGE, USER_AGENT
 from scraper.config_loader import AppConfig, ConfigError, keyword_slug, load
 from scraper.log import get_logger as _get_logger
@@ -445,6 +446,47 @@ def get_scrape_status() -> dict[str, Any]:
             pass
 
     return {"available": True, **status, "recent_logs": recent_logs}
+
+
+@mcp.tool()
+def insert_scrape_run(run_data: dict[str, Any]) -> dict[str, Any]:
+    """Insert a scraping run record into MongoDB for history tracking.
+
+    Args:
+        run_data: Arbitrary dict with run details. Recommended keys:
+            run_metadata: {ok, exit_code, keywords, requested_sites, errors}
+            per_site_counts: {<site>: {<keyword>: <count>}}
+            raw_results: full results array from scrape_jobs
+            bot_post_status: {total_posted, failed}
+
+    Returns:
+        On success: {ok: true, inserted_id: <str>}
+        On failure: {ok: false, error: <str>}
+    """
+    try:
+        inserted_id = mongo.insert_run(run_data)
+        return {"ok": True, "inserted_id": inserted_id}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
+
+
+@mcp.tool()
+def get_latest_scrape_run() -> dict[str, Any]:
+    """Return the most recent scraping run record from MongoDB.
+
+    Returns:
+        {available: false, message: str} when no runs have been recorded
+        {available: false, error: str} when MongoDB is unreachable
+        {available: true, _id, _created_at, run_metadata, per_site_counts,
+         raw_results, bot_post_status, ...} on success
+    """
+    try:
+        doc = mongo.get_latest_run()
+        if doc is None:
+            return {"available": False, "message": "No scrape runs recorded yet."}
+        return {"available": True, **doc}
+    except Exception as exc:
+        return {"available": False, "error": str(exc)}
 
 
 @mcp.tool()
