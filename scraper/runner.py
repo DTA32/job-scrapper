@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Iterable
-
 from urllib.parse import urlparse
 
 from .config_loader import ALLOWED_URL_HOSTS, AppConfig, keyword_slug
@@ -26,7 +25,11 @@ _LOG = get_logger()
 
 def default_fetch_chain(proxy: str | None = None) -> FetchChain:
     return FetchChain(
-        [CurlCffiFetcher(proxy=proxy), CloudscraperFetcher(proxy=proxy), PlaywrightFetcher(proxy=proxy)]
+        [
+            CurlCffiFetcher(proxy=proxy),
+            CloudscraperFetcher(proxy=proxy),
+            PlaywrightFetcher(proxy=proxy),
+        ]
     )
 
 
@@ -49,7 +52,7 @@ def _within_max_age(job: Job, cutoff: datetime | None) -> bool:
     except ValueError:
         return True
     if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=timezone.utc)
+        parsed = parsed.replace(tzinfo=UTC)
     return parsed >= cutoff
 
 
@@ -123,13 +126,9 @@ def run_one(
 
     if html:
         debug_path.write_text(html)
-        _LOG.info(
-            "[%s] saved raw html → %s (%d bytes)", label, debug_path.name, len(html)
-        )
+        _LOG.info("[%s] saved raw html → %s (%d bytes)", label, debug_path.name, len(html))
     else:
-        _LOG.info(
-            "[%s] no search html (scraper handles fetch internally)", label
-        )
+        _LOG.info("[%s] no search html (scraper handles fetch internally)", label)
 
     jobs = scraper.parse(html or "")
     parsed_count = len(jobs)
@@ -139,7 +138,7 @@ def run_one(
 
     cutoff: datetime | None = None
     if max_age_hours is not None:
-        cutoff = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
+        cutoff = datetime.now(UTC) - timedelta(hours=max_age_hours)
         before = len(jobs)
         jobs = [j for j in jobs if _within_max_age(j, cutoff)]
         dropped = before - len(jobs)
@@ -241,9 +240,7 @@ def run(
         scraper = scraper_cls(url=url, limit=config.limit_for(name))
         keyword_dir = out / keyword_slug(keyword)
         if not keyword_dir.resolve().is_relative_to(out):
-            _LOG.warning(
-                "[runner] keyword '%s' slug escapes output_dir; skipping", keyword
-            )
+            _LOG.warning("[runner] keyword '%s' slug escapes output_dir; skipping", keyword)
             return
         run_one(
             scraper,
@@ -273,7 +270,5 @@ def run(
             try:
                 fut.result()
             except Exception as exc:
-                _LOG.error(
-                    "[%s:%s] thread error: %s", name, keyword_slug(keyword), exc
-                )
+                _LOG.error("[%s:%s] thread error: %s", name, keyword_slug(keyword), exc)
     return 0

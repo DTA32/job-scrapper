@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import shutil
 import tempfile
 import time
 from copy import deepcopy
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse, urlunparse
@@ -40,9 +41,7 @@ def _load_config(path: Path) -> AppConfig:
     return load(path)
 
 
-def _read_site_output(
-    config: AppConfig, keyword: str, name: str
-) -> dict[str, Any] | None:
+def _read_site_output(config: AppConfig, keyword: str, name: str) -> dict[str, Any] | None:
     path = config.output_dir / keyword_slug(keyword) / f"{name}.json"
     if not path.exists():
         return None
@@ -150,7 +149,7 @@ def _probe_proxy_http(proxy_url: str, test_url: str) -> dict[str, Any]:
 
 
 def _write_status(result: dict[str, Any], duration: float) -> None:
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     errors: list[dict[str, Any]] = result.get("errors", [])
 
     last_error: dict[str, Any] | None = None
@@ -180,10 +179,8 @@ def _write_status(result: dict[str, Any], duration: float) -> None:
 
     existing_per_site: dict[str, Any] = {}
     if _STATUS_PATH.exists():
-        try:
+        with contextlib.suppress(json.JSONDecodeError, OSError):
             existing_per_site = json.loads(_STATUS_PATH.read_text()).get("per_site", {})
-        except (json.JSONDecodeError, OSError):
-            pass
     merged_per_site = {**existing_per_site, **per_site}
 
     total_jobs = sum(
@@ -211,9 +208,7 @@ def _write_status(result: dict[str, Any], duration: float) -> None:
     _STATUS_PATH.write_text(json.dumps(status, indent=2))
 
 
-def _normalize_job_payload(
-    raw_job: Any, site_name: str, keyword: str
-) -> dict[str, Any]:
+def _normalize_job_payload(raw_job: Any, site_name: str, keyword: str) -> dict[str, Any]:
     source = raw_job if isinstance(raw_job, dict) else {}
     normalized = {field: source.get(field) for field in JOB_FIELD_ORDER}
     normalized["site"] = source.get("site") or site_name
@@ -227,16 +222,15 @@ def _normalize_site_payload(
     raw_jobs = payload.get("jobs")
     jobs = raw_jobs if isinstance(raw_jobs, list) else []
     normalized_jobs = [
-        _normalize_job_payload(job, site_name=site_name, keyword=keyword)
-        for job in jobs
+        _normalize_job_payload(job, site_name=site_name, keyword=keyword) for job in jobs
     ]
 
     raw_fields = payload.get("fields")
-    fields = [
-        field
-        for field in raw_fields
-        if isinstance(field, str) and field in JOB_FIELD_ORDER
-    ] if isinstance(raw_fields, list) else []
+    fields = (
+        [field for field in raw_fields if isinstance(field, str) and field in JOB_FIELD_ORDER]
+        if isinstance(raw_fields, list)
+        else []
+    )
     if not fields:
         fields = list(JOB_FIELD_ORDER)
 
@@ -276,9 +270,7 @@ def list_sites() -> dict[str, Any]:
                 "name": site.name,
                 "enabled": site.enabled,
                 "url_template": site.url_template,
-                "sample_url": (
-                    site.url_for(sample_keyword) if sample_keyword else None
-                ),
+                "sample_url": (site.url_for(sample_keyword) if sample_keyword else None),
             }
             for site in config.sites
         ],
@@ -304,7 +296,7 @@ def get_config() -> dict[str, Any]:
 @mcp.tool()
 def get_scrape_response_structure() -> dict[str, Any]:
     """Return canonical schema and example payload for scrape_jobs response."""
-    sample_job = {field: None for field in JOB_FIELD_ORDER}
+    sample_job: dict[str, Any] = {field: None for field in JOB_FIELD_ORDER}
     sample_job["site"] = "jobstreet"
     sample_job["matched_keyword"] = "data analyst"
     sample_job["title"] = "Data Analyst"
@@ -396,9 +388,7 @@ def update_config(patch: dict[str, Any]) -> dict[str, Any]:
 
     merged = _deep_merge(current, patch)
 
-    with tempfile.NamedTemporaryFile(
-        "w", suffix=".yaml", delete=False, encoding="utf-8"
-    ) as fh:
+    with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False, encoding="utf-8") as fh:
         yaml.safe_dump(merged, fh, sort_keys=False, allow_unicode=True)
         validation_tmp = Path(fh.name)
     try:
@@ -501,8 +491,7 @@ def test_proxy_connection(
             return {
                 "ok": False,
                 "error": (
-                    "no proxy in config.yaml and proxy_url not passed — "
-                    "set proxy or pass proxy_url"
+                    "no proxy in config.yaml and proxy_url not passed — set proxy or pass proxy_url"
                 ),
             }
         resolved_proxy = config.proxy.url
@@ -595,9 +584,7 @@ def scrape_jobs(
     target_sites = list(sites) if sites else list(config.enabled_site_names())
     target_keywords = list(keywords) if keywords else list(config.keywords)
 
-    exit_code = run_scraper(
-        config, targets=target_sites, keywords=target_keywords
-    )
+    exit_code = run_scraper(config, targets=target_sites, keywords=target_keywords)
 
     results: list[dict[str, Any]] = []
     errors: list[dict[str, str]] = []
@@ -631,9 +618,7 @@ def scrape_jobs(
             per_site.append(normalized_site)
         results.append({"keyword": keyword, "sites": per_site})
 
-    total_jobs = sum(
-        s.get("count", 0) for r in results for s in r.get("sites", [])
-    )
+    total_jobs = sum(s.get("count", 0) for r in results for s in r.get("sites", []))
     result = {
         "ok": len(errors) == 0,
         "keywords": target_keywords,

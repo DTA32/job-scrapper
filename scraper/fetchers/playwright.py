@@ -1,6 +1,7 @@
 # scraper/fetchers/playwright.py
 from __future__ import annotations
 
+import contextlib
 import time
 
 from ..config import USER_AGENT
@@ -66,10 +67,8 @@ class PlaywrightFetcher:
                     stealth_sync(page)
 
                 page.goto(url, wait_until="domcontentloaded", timeout=60_000)
-                try:
+                with contextlib.suppress(Exception):
                     page.wait_for_load_state("networkidle", timeout=15_000)
-                except Exception:
-                    pass
                 time.sleep(2)
                 html = page.content()
                 context.close()

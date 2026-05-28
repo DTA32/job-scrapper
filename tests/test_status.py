@@ -4,8 +4,10 @@ from __future__ import annotations
 import json
 from unittest.mock import patch
 
-from mcp_server.server import _write_status  # type: ignore[attr-defined]
-from mcp_server.server import get_scrape_status  # type: ignore[attr-defined]
+from mcp_server.server import (
+    _write_status,  # type: ignore[attr-defined]
+    get_scrape_status,  # type: ignore[attr-defined]
+)
 
 
 def _ok_result(keyword: str = "engineer", site: str = "glints", count: int = 3) -> dict:
@@ -61,18 +63,22 @@ def test_write_status_records_error(tmp_path):
 
 def test_write_status_merges_existing_per_site(tmp_path):
     status_path = tmp_path / "status.json"
-    status_path.write_text(json.dumps({
-        "last_run": {},
-        "last_error": None,
-        "per_site": {
-            "linkedin": {
-                "last_run_at": "2026-01-01T00:00:00+00:00",
-                "last_status": "ok",
-                "last_job_count": 7,
+    status_path.write_text(
+        json.dumps(
+            {
+                "last_run": {},
                 "last_error": None,
+                "per_site": {
+                    "linkedin": {
+                        "last_run_at": "2026-01-01T00:00:00+00:00",
+                        "last_status": "ok",
+                        "last_job_count": 7,
+                        "last_error": None,
+                    }
+                },
             }
-        },
-    }))
+        )
+    )
     with patch("mcp_server.server._STATUS_PATH", status_path):
         _write_status(_ok_result(site="glints"), 3.0)
 
@@ -132,11 +138,15 @@ def test_get_scrape_status_includes_recent_logs(tmp_path):
     status_path = tmp_path / "status.json"
     log_path = tmp_path / "scraper.log"
 
-    status_path.write_text(json.dumps({
-        "last_run": {"ok": True, "total_jobs": 1, "error_count": 0},
-        "last_error": None,
-        "per_site": {},
-    }))
+    status_path.write_text(
+        json.dumps(
+            {
+                "last_run": {"ok": True, "total_jobs": 1, "error_count": 0},
+                "last_error": None,
+                "per_site": {},
+            }
+        )
+    )
     log_lines = [f"line {i}" for i in range(50)]
     log_path.write_text("\n".join(log_lines))
 

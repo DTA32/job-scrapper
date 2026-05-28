@@ -23,5 +23,5 @@ class Scraper(ABC):
     def parse_detail(self, html: str) -> str | None:
         return None
 
-    def detail_fetch(self, url: str, fetcher: "FetchChain") -> "FetchResult":
+    def detail_fetch(self, url: str, fetcher: FetchChain) -> FetchResult:
         return fetcher.fetch(url)

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from urllib.parse import parse_qs, urlparse
 
 from bs4 import BeautifulSoup
@@ -13,7 +13,7 @@ _LOG = get_logger()
 
 _INDEED_API_URL = "https://apis.indeed.com/graphql"
 _INDEED_API_KEY = (
-    "161092c2017b5bbab13edb12461a62d5a833871e7cad6d9d475304573de67ac8"
+    "161092c2017b5bbab13edb12461a62d5a833871e7cad6d9d475304573de67ac8"  # pragma: allowlist secret
 )
 _INDEED_API_HEADERS = {
     "Host": "apis.indeed.com",
@@ -26,9 +26,7 @@ _INDEED_API_HEADERS = {
         "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6_1 like Mac OS X) "
         "AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Indeed App 193.1"
     ),
-    "indeed-app-info": (
-        "appv=193.1; appid=com.indeed.jobsearch; osv=16.6.1; os=ios; dtype=phone"
-    ),
+    "indeed-app-info": ("appv=193.1; appid=com.indeed.jobsearch; osv=16.6.1; os=ios; dtype=phone"),
     "indeed-co": "ID",
 }
 
@@ -108,10 +106,10 @@ def _format_salary(compensation: dict | None) -> str | None:
 
 
 def _iso_from_millis(value: object) -> str | None:
-    if not isinstance(value, (int, float)) or value <= 0:
+    if not isinstance(value, int | float) or value <= 0:
         return None
     try:
-        return datetime.fromtimestamp(int(value) / 1000, tz=timezone.utc).isoformat()
+        return datetime.fromtimestamp(int(value) / 1000, tz=UTC).isoformat()
     except (ValueError, OSError):
         return None
 
@@ -168,12 +166,7 @@ def _fetch_jobs_from_api(keyword: str, where: str, limit: int) -> list[dict]:
     errors = payload.get("errors")
     if errors:
         _LOG.warning("[indeed-api] graphql errors: %s", errors)
-    results = (
-        (payload.get("data") or {})
-        .get("jobSearch", {})
-        .get("results")
-        or []
-    )
+    results = (payload.get("data") or {}).get("jobSearch", {}).get("results") or []
     jobs: list[dict] = []
     for item in results:
         if not isinstance(item, dict):

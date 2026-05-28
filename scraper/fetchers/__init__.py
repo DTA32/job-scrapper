@@ -3,8 +3,8 @@ from __future__ import annotations
 from .base import (
     FetchAttempt,
     FetchChain,
-    FetchResult,
     Fetcher,
+    FetchResult,
     detect_challenge,
     looks_like_challenge,
 )
