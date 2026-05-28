@@ -4,7 +4,10 @@ from __future__ import annotations
 
 def test_get_logger_returns_named_logger(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    import importlib, scraper.log as log_mod
+    import importlib
+
+    import scraper.log as log_mod
+
     importlib.reload(log_mod)
 
     logger = log_mod.get_logger()
@@ -13,7 +16,10 @@ def test_get_logger_returns_named_logger(tmp_path, monkeypatch):
 
 def test_get_logger_has_two_handlers(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    import importlib, scraper.log as log_mod
+    import importlib
+
+    import scraper.log as log_mod
+
     importlib.reload(log_mod)
 
     logger = log_mod.get_logger()
@@ -22,7 +28,10 @@ def test_get_logger_has_two_handlers(tmp_path, monkeypatch):
 
 def test_get_logger_is_idempotent(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    import importlib, scraper.log as log_mod
+    import importlib
+
+    import scraper.log as log_mod
+
     importlib.reload(log_mod)
 
     logger = log_mod.get_logger()
@@ -33,7 +42,10 @@ def test_get_logger_is_idempotent(tmp_path, monkeypatch):
 
 def test_get_logger_creates_logs_dir(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    import importlib, scraper.log as log_mod
+    import importlib
+
+    import scraper.log as log_mod
+
     importlib.reload(log_mod)
 
     log_mod.get_logger()

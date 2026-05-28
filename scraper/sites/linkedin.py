@@ -42,9 +42,9 @@ class LinkedinScraper(Scraper):
             title_el = card.select_one("h3.base-search-card__title") or card.select_one(
                 ".base-search-card__title"
             )
-            company_el = card.select_one(
-                "h4.base-search-card__subtitle a"
-            ) or card.select_one(".base-search-card__subtitle")
+            company_el = card.select_one("h4.base-search-card__subtitle a") or card.select_one(
+                ".base-search-card__subtitle"
+            )
             loc_el = card.select_one(".job-search-card__location")
             link_el = card.select_one("a.base-card__full-link") or card.select_one(
                 "a[href*='/jobs/view/']"

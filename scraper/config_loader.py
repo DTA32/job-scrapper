@@ -10,22 +10,22 @@ from .types import CANONICAL_FIELDS, MANDATORY_FIELDS
 
 DEFAULT_FIELDS: tuple[str, ...] = ("title", "company", "location", "url")
 
-FILTERABLE_FIELDS: frozenset[str] = frozenset(
-    {"location", "employment_type", "work_type"}
-)
+FILTERABLE_FIELDS: frozenset[str] = frozenset({"location", "employment_type", "work_type"})
 
-ALLOWED_URL_HOSTS: frozenset[str] = frozenset({
-    "id.jobstreet.com",
-    "jobstreet.com",
-    "glints.com",
-    "id.glints.com",
-    "www.linkedin.com",
-    "linkedin.com",
-    "id.linkedin.com",
-    "id.indeed.com",
-    "indeed.com",
-    "www.indeed.com",
-})
+ALLOWED_URL_HOSTS: frozenset[str] = frozenset(
+    {
+        "id.jobstreet.com",
+        "jobstreet.com",
+        "glints.com",
+        "id.glints.com",
+        "www.linkedin.com",
+        "linkedin.com",
+        "id.linkedin.com",
+        "id.indeed.com",
+        "indeed.com",
+        "www.indeed.com",
+    }
+)
 
 
 class ConfigError(ValueError):
@@ -82,9 +82,7 @@ class AppConfig:
     def fields_for(self, site_name: str) -> frozenset[str]:
         cfg = self.site(site_name)
         configured = (
-            cfg.effective_fields(self.default_fields)
-            if cfg is not None
-            else self.default_fields
+            cfg.effective_fields(self.default_fields) if cfg is not None else self.default_fields
         )
         return MANDATORY_FIELDS | frozenset(configured)
 
@@ -118,14 +116,12 @@ def _validate_url_host(site_name: str, template: str) -> None:
     parsed = urlparse(template)
     if parsed.scheme not in ("http", "https"):
         raise ConfigError(
-            f"site '{site_name}' url_template scheme must be http or https, "
-            f"got '{parsed.scheme}'"
+            f"site '{site_name}' url_template scheme must be http or https, got '{parsed.scheme}'"
         )
     host = (parsed.hostname or "").lower()
     if "{" in host or "}" in host:
         raise ConfigError(
-            f"site '{site_name}' url_template hostname must be a fixed domain, "
-            f"not a placeholder"
+            f"site '{site_name}' url_template hostname must be a fixed domain, not a placeholder"
         )
     if host not in ALLOWED_URL_HOSTS:
         raise ConfigError(
@@ -156,16 +152,12 @@ def _resolve_url(site_name: str, template: str, vars_: dict[str, str]) -> str:
 def _parse_max_age(raw: object, source: str) -> int | None:
     if raw is None:
         return None
-    if isinstance(raw, bool) or not isinstance(raw, (int, float, str)):
-        raise ConfigError(
-            f"{source} must be a positive integer or null, got {raw!r}"
-        )
+    if isinstance(raw, bool) or not isinstance(raw, int | float | str):
+        raise ConfigError(f"{source} must be a positive integer or null, got {raw!r}")
     try:
         value = int(raw)
     except (TypeError, ValueError) as exc:
-        raise ConfigError(
-            f"{source} must be a positive integer or null, got {raw!r}"
-        ) from exc
+        raise ConfigError(f"{source} must be a positive integer or null, got {raw!r}") from exc
     if value < 1:
         raise ConfigError(f"{source} must be >= 1, got {value}")
     return value
@@ -181,9 +173,12 @@ def _validate_fields(raw: object, source: str) -> tuple[str, ...]:
             raise ConfigError(f"{source} entries must be strings, got {entry!r}")
         if entry not in CANONICAL_FIELDS:
             from .log import get_logger as _get_logger
+
             _get_logger().warning(
                 "[config] %s contains unknown field '%s'; ignored. allowed: %s",
-                source, entry, sorted(CANONICAL_FIELDS),
+                source,
+                entry,
+                sorted(CANONICAL_FIELDS),
             )
             continue
         cleaned.append(entry)
@@ -198,16 +193,12 @@ def _normalize_filter_value(raw: object, source: str) -> list[str]:
         cleaned: list[str] = []
         for entry in raw:
             if not isinstance(entry, str):
-                raise ConfigError(
-                    f"{source} entries must be strings, got {entry!r}"
-                )
+                raise ConfigError(f"{source} entries must be strings, got {entry!r}")
             normalized = entry.strip().lower()
             if normalized:
                 cleaned.append(normalized)
         return cleaned
-    raise ConfigError(
-        f"{source} must be a string or list of strings, got {type(raw).__name__}"
-    )
+    raise ConfigError(f"{source} must be a string or list of strings, got {type(raw).__name__}")
 
 
 def _validate_filter(raw: object, source: str) -> dict[str, list[str]]:
@@ -221,9 +212,12 @@ def _validate_filter(raw: object, source: str) -> dict[str, list[str]]:
             raise ConfigError(f"{source} keys must be strings, got {key!r}")
         if key not in FILTERABLE_FIELDS:
             from .log import get_logger as _get_logger
+
             _get_logger().warning(
                 "[config] %s contains unknown filter field '%s'; ignored. allowed: %s",
-                source, key, sorted(FILTERABLE_FIELDS),
+                source,
+                key,
+                sorted(FILTERABLE_FIELDS),
             )
             continue
         if value is None or value == "":
@@ -310,9 +304,7 @@ def load(path: Path) -> AppConfig:
                     f"sites.{name}.limit must be an integer, got {cfg['limit']!r}"
                 ) from exc
             if site_limit < 1:
-                raise ConfigError(
-                    f"sites.{name}.limit must be >= 1, got {site_limit}"
-                )
+                raise ConfigError(f"sites.{name}.limit must be >= 1, got {site_limit}")
 
         sites.append(
             SiteConfig(
@@ -338,9 +330,7 @@ def load(path: Path) -> AppConfig:
     try:
         concurrency = int(concurrency_raw)
     except (TypeError, ValueError) as exc:
-        raise ConfigError(
-            f"'concurrency' must be an integer, got {concurrency_raw!r}"
-        ) from exc
+        raise ConfigError(f"'concurrency' must be an integer, got {concurrency_raw!r}") from exc
     if concurrency < 1:
         raise ConfigError(f"'concurrency' must be >= 1, got {concurrency}")
 

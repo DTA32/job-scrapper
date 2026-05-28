@@ -7,8 +7,7 @@ from .jobstreet import JobstreetScraper
 from .linkedin import LinkedinScraper
 
 SCRAPERS: dict[str, type[Scraper]] = {
-    cls.name: cls
-    for cls in (JobstreetScraper, GlintsScraper, LinkedinScraper, IndeedScraper)
+    cls.name: cls for cls in (JobstreetScraper, GlintsScraper, LinkedinScraper, IndeedScraper)
 }
 
 __all__ = [
