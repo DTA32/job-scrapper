@@ -36,9 +36,12 @@ services:
     restart: unless-stopped
     profiles: ["mcp"]
     ports:
-      - "27017:27017"
+      - "127.0.0.1:27017:27017"
     volumes:
       - mongo-data:/data/db
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_ROOT_USER:-admin}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_ROOT_PASSWORD}
 
   # SERVICE: scraper-mcp — long-running MCP HTTP server; profile-gated so `docker compose up` skips it by default
   scraper-mcp:
@@ -62,7 +65,7 @@ services:
       - ./output:/app/output
       - ./docs:/app/docs:ro
     environment:
-      - MONGO_URI=mongodb://mongo:27017
+      - MONGO_URI=mongodb://${MONGO_ROOT_USER:-admin}:${MONGO_ROOT_PASSWORD}@mongo:27017
 
   # SERVICE: bot — cron bot; runs claude-code on a schedule; profile-gated so `docker compose up` skips it by default
   bot:
