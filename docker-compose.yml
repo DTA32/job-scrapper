@@ -29,6 +29,17 @@ services:
     environment:
       - PROXY_URL=${PROXY_URL:-}
 
+  # SERVICE: mongo — persistent MongoDB store for scrape run history
+  mongo:
+    image: mongo:7
+    container_name: job-scraper-mongo
+    restart: unless-stopped
+    profiles: ["mcp"]
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+
   # SERVICE: scraper-mcp — long-running MCP HTTP server; profile-gated so `docker compose up` skips it by default
   scraper-mcp:
     build:
@@ -42,12 +53,16 @@ services:
     depends_on:
       output-init:
         condition: service_completed_successfully
+      mongo:
+        condition: service_started
     ports:
       - "8080:8080"
     volumes:
       - ./config.yaml:/app/config.yaml
       - ./output:/app/output
       - ./docs:/app/docs:ro
+    environment:
+      - MONGO_URI=mongodb://mongo:27017
 
   # SERVICE: bot — cron bot; runs claude-code on a schedule; profile-gated so `docker compose up` skips it by default
   bot:
@@ -72,3 +87,6 @@ services:
       - ~/.claude.json:/home/node/.claude.json
       - ./config.yaml:/workspace/config.yaml:ro
       - ./output:/workspace/output
+
+volumes:
+  mongo-data:
