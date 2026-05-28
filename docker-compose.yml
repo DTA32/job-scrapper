@@ -10,24 +10,25 @@ services:
       - ./output:/out
 
   # SERVICE: scraper — one-shot CLI scraper; network_mode:host for SOCKS5 proxy passthrough
-  scraper:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: scraper-cli
-    image: job-scraper:latest
-    container_name: job-scraper
-    restart: "no"
-    profiles: ["scraper"]
-    network_mode: host
-    depends_on:
-      output-init:
-        condition: service_completed_successfully
-    volumes:
-      - ./config.yaml:/app/config.yaml:ro
-      - ./output:/app/output
-    environment:
-      - PROXY_URL=${PROXY_URL:-}
+  # Disabled, this is just to test if the scraper works independently
+  # scraper:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #     target: scraper-cli
+  #   image: job-scraper:latest
+  #   container_name: job-scraper
+  #   restart: "no"
+  #   profiles: ["scraper"]
+  #   network_mode: host
+  #   depends_on:
+  #     output-init:
+  #       condition: service_completed_successfully
+  #   volumes:
+  #     - ./config.yaml:/app/config.yaml:ro
+  #     - ./output:/app/output
+  #   environment:
+  #     - PROXY_URL=${PROXY_URL:-}
 
   # SERVICE: mongo — persistent MongoDB store for scrape run history
   mongo:

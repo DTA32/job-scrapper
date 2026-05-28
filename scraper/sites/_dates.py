@@ -7,8 +7,8 @@ import dateparser
 
 _PARSER_SETTINGS: dict[str, Any] = {
     "RETURN_AS_TIMEZONE_AWARE": True,
-    "TIMEZONE": "UTC",
-    "TO_TIMEZONE": "UTC",
+    "TIMEZONE": "timezone.utc",
+    "TO_TIMEZONE": "timezone.utc",
     "PREFER_DATES_FROM": "past",
 }
 
