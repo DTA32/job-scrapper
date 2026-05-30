@@ -87,3 +87,6 @@ CLAUDE.md
 .cursorrules
 AGENTS.md
 scripts/rev-socks.sh
+
+# Local SSH tunnel script (hardcodes server host/user) — copy from the .example
+scripts/ssh-tunnel.sh
