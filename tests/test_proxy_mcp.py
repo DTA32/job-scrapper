@@ -8,7 +8,7 @@ from mcp_server.server import test_proxy_connection as probe_proxy_connection
 
 
 def test_redact_proxy_url_hides_password():
-    u = "http://user:secret@proxy.example.com:8080/path"
+    u = "http://user:secret@proxy.example.com:8080/path"  # pragma: allowlist secret
     r = _redact_proxy_url(u)
     assert "secret" not in r
     assert "user:***" in r

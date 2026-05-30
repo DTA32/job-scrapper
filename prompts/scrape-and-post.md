@@ -117,6 +117,45 @@ Scraped {total_jobs} jobs across {len(keywords)} keyword(s) and
 
 Skip this footer if `total_jobs == 0` (the run produced nothing useful).
 
+## Step 6 — Record the run in MongoDB
+
+After sending the summary footer (or immediately after posting all job messages if
+`total_jobs == 0`), call the `job-scraper` MCP tool `insert_scrape_run` with a
+single `run_data` argument assembled as follows:
+
+```json
+{
+  "run_metadata": {
+    "ok": "<bool — top-level ok from scrape_jobs>",
+    "exit_code": "<int>",
+    "keywords": ["..."],
+    "requested_sites": ["..."],
+    "errors": ["..."]
+  },
+  "per_site_counts": {
+    "<site_name>": { "<keyword>": "<count_int>" }
+  },
+  "raw_results": "<the full results array from scrape_jobs>",
+  "bot_post_status": {
+    "total_posted": "<number of Discord messages sent successfully>",
+    "failed": "<number that errored or got a non-2xx response>"
+  }
+}
+```
+
+`per_site_counts` is derived from `results[*].sites[*]`:
+
+```js
+// pseudocode
+for each keyword_group in results:
+  for each site_entry in keyword_group.sites:
+    per_site_counts[site_entry.site][keyword_group.keyword] = site_entry.count
+```
+
+If `insert_scrape_run` returns `{ok: false}`, print one diagnostic line
+(`MongoDB insert failed: <error>`) but do **not** retry or abort — job posting
+always takes priority over history recording.
+
 ## Notes
 
 - Do **not** call `update_config`. This prompt is read-only against the

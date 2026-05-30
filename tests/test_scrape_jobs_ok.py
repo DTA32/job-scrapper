@@ -117,6 +117,7 @@ def test_scrape_jobs_writes_status(mock_read, mock_load, mock_run, mock_write_st
     }
 
     from mcp_server.server import scrape_jobs
+
     scrape_jobs(keywords=["data analyst"], sites=["jobstreet"])
 
     mock_write_status.assert_called_once()
@@ -128,9 +129,7 @@ def test_scrape_jobs_writes_status(mock_read, mock_load, mock_run, mock_write_st
 @patch("mcp_server.server.run_scraper", return_value=0)
 @patch("mcp_server.server._load_config")
 @patch("mcp_server.server._read_site_output")
-def test_scrape_jobs_normalizes_jobs_to_canonical_schema(
-    mock_read, mock_load, mock_run
-):
+def test_scrape_jobs_normalizes_jobs_to_canonical_schema(mock_read, mock_load, mock_run):
     mock_load.return_value = _make_config()
     mock_read.return_value = {
         "keyword": "data analyst",

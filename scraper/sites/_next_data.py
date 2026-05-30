@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from bs4 import BeautifulSoup
 
@@ -17,9 +18,7 @@ def extract_next_data(html: str) -> dict | None:
         return None
 
 
-def walk_dicts(
-    obj: Any, predicate: Callable[[dict], bool], out: list[dict]
-) -> None:
+def walk_dicts(obj: Any, predicate: Callable[[dict], bool], out: list[dict]) -> None:
     if isinstance(obj, dict):
         if predicate(obj):
             out.append(obj)

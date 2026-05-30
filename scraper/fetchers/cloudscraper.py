@@ -24,9 +24,7 @@ class CloudscraperFetcher:
             scraper = cloudscraper.create_scraper(  # type: ignore[attr-defined]
                 browser={"browser": "chrome", "platform": "linux", "mobile": False}
             )
-            scraper.headers.update(
-                {"User-Agent": USER_AGENT, "Accept-Language": ACCEPT_LANGUAGE}
-            )
+            scraper.headers.update({"User-Agent": USER_AGENT, "Accept-Language": ACCEPT_LANGUAGE})
             proxies = {"http": self._proxy, "https": self._proxy} if self._proxy else None
             response = scraper.get(url, timeout=30, proxies=proxies)
         except Exception as exc:

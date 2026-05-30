@@ -34,6 +34,27 @@ The compose file includes an `output-init` service that ensures
 bind-mounted `output/` is writable by the container's `pwuser` (uid 1000)
 on every run — no manual `chown` needed.
 
+### Bot
+
+The `scraper-bot` image runs `claude-code` on a supercronic schedule. It
+invokes the MCP server to trigger scrapes and posts results to a Discord
+channel.
+
+```bash
+docker build --target bot -t scraper-bot .
+docker run -d --name scraper-bot \
+  --add-host=host.docker.internal:host-gateway \
+  -v "$HOME/.claude:/home/node/.claude" \
+  -v "$HOME/.claude.json:/home/node/.claude.json" \
+  -e DISCORD_BOT_TOKEN=<token> \
+  -e DISCORD_CHANNEL_ID=<channel_id> \
+  scraper-bot
+```
+
+The schedule is read from `config.yaml` under `bot.schedule` (cron
+expression) at image build time. To change it, update `config.yaml` and
+rebuild.
+
 ### MCP server
 
 ```bash
@@ -101,14 +122,15 @@ writes, and keeps a timestamped backup. See [`docs/mcp.md`](docs/mcp.md).
 ## Project layout
 
 ```
-scraper/        # CLI + library — runner, config_loader, sites, fetchers
-mcp_server/     # FastMCP HTTP server wrapping the scraper
-docs/           # all reference + recipes
-config.yaml     # the only thing you edit at runtime
-Dockerfile      # multi-target: scraper-cli, mcp-server
+scraper/               # CLI + library — runner, config_loader, sites, fetchers
+mcp_server/            # FastMCP HTTP server wrapping the scraper
+cron/                  # bot entrypoint and supercronic schedule scripts
+prompts/               # Claude prompt templates used by the bot
+claude/                # MCP config example for Claude Code registration
+docs/                  # all reference + recipes
+config.yaml            # the only thing you edit at runtime
+Dockerfile             # multi-target: scraper-cli, mcp-server, bot
 docker-compose.yml
+docker-compose.dev.yml
+docker-compose.prod.yml
 ```
-
-## License
-
-(unspecified)
