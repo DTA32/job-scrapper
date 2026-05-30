@@ -1,0 +1,141 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Reverse SOCKS5 proxy helper for the dev/prod scraper.
+#
+# Opens a reverse dynamic SOCKS tunnel (-R) so the remote scraper routes its
+# outbound HTTP traffic through THIS machine's residential IP, dodging the
+# datacenter IP blocks on jobstreet/glints/linkedin. The scraper reads
+# `socks5://localhost:1080` from config.yaml; scraper-mcp runs
+# `network_mode: host`, so that maps to the remote :1080 this tunnel provides.
+#
+# Setup:
+#   1. cp scripts/ssh-tunnel.sh.example scripts/ssh-tunnel.sh
+#   2. Set SSH_HOST / SSH_USER below (or export them as env vars).
+#   3. ssh-tunnel.sh is git-ignored — the real host/user stay local.
+#
+# Usage:
+#   ./scripts/ssh-tunnel.sh up      # open the reverse SOCKS proxy
+#   ./scripts/ssh-tunnel.sh down    # close it
+#   ./scripts/ssh-tunnel.sh status  # proxy liveness + docker ps on remote
+#   ./scripts/ssh-tunnel.sh test    # verify remote egress exits via this machine
+
+SSH_HOST="${SSH_HOST:-YOUR_SERVER_IP}"
+SSH_USER="${SSH_USER:-YOUR_SSH_USER}"
+SSH_KEY="${SSH_KEY:-}"
+PROXY_PORT="${PROXY_PORT:-1080}" # Check this from the config.yaml on "proxy" key
+PID_FILE="/tmp/job-scrapper-ssh-socks.pid"
+CMD="${1:-status}"
+
+# --- helpers ---
+
+ssh_args() {
+  local args=(-o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 -o BatchMode=yes)
+  [ -n "$SSH_KEY" ] && args+=(-i "$SSH_KEY")
+  echo "${args[@]}"
+}
+
+tunnel_pid() {
+  [ -f "$PID_FILE" ] || return 1
+  local pid
+  pid=$(cat "$PID_FILE")
+  kill -0 "$pid" 2>/dev/null && echo "$pid"
+}
+
+# --- commands ---
+
+cmd_up() {
+  if tunnel_pid &>/dev/null; then
+    echo "Proxy already up (PID $(tunnel_pid))."
+    return 0
+  fi
+
+  echo "==> Opening reverse SOCKS proxy: ${SSH_HOST}:${PROXY_PORT} → this machine..."
+  # -R with a bare port = reverse dynamic SOCKS: remote :PROXY_PORT tunnels out
+  # through this client. Requires OpenSSH client >= 7.6.
+  # shellcheck disable=SC2046
+  ssh $(ssh_args) \
+    -N \
+    -o ExitOnForwardFailure=yes \
+    -o ServerAliveInterval=30 -o ServerAliveCountMax=3 \
+    -R "${PROXY_PORT}" \
+    "${SSH_USER}@${SSH_HOST}" &
+  echo $! > "$PID_FILE"
+  sleep 1
+
+  if tunnel_pid &>/dev/null; then
+    echo "    Proxy up (PID $(cat "$PID_FILE")). Remote scraper → socks5://localhost:${PROXY_PORT}"
+  else
+    echo "ERROR: proxy process died immediately (forward rejected?)." >&2
+    rm -f "$PID_FILE"
+    exit 1
+  fi
+}
+
+cmd_down() {
+  local pid
+  pid=$(tunnel_pid 2>/dev/null) || { echo "No proxy running."; return 0; }
+  echo "==> Closing SOCKS proxy (PID ${pid})..."
+  kill "$pid"
+  rm -f "$PID_FILE"
+  echo "    Done."
+}
+
+cmd_status() {
+  echo "--- socks proxy (-R) ---"
+  local pid
+  if pid=$(tunnel_pid 2>/dev/null); then
+    echo "UP   PID=${pid}  ${SSH_HOST}:${PROXY_PORT} → this machine"
+  else
+    echo "DOWN (run 'up' to start)"
+    rm -f "$PID_FILE" 2>/dev/null || true
+  fi
+
+  echo ""
+  echo "--- remote containers ---"
+  # shellcheck disable=SC2046
+  ssh $(ssh_args) "${SSH_USER}@${SSH_HOST}" \
+    'docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"'
+}
+
+cmd_test() {
+  if ! tunnel_pid &>/dev/null; then
+    echo "ERROR: proxy not running — run 'up' first." >&2
+    exit 1
+  fi
+
+  echo "==> Verifying remote egress through proxy (socks5://localhost:${PROXY_PORT})..."
+  local direct proxied
+  # shellcheck disable=SC2046
+  direct=$(ssh $(ssh_args) "${SSH_USER}@${SSH_HOST}" \
+    'curl -s --max-time 15 https://ifconfig.me')
+  # shellcheck disable=SC2046
+  proxied=$(ssh $(ssh_args) "${SSH_USER}@${SSH_HOST}" \
+    "curl -s --socks5-hostname localhost:${PROXY_PORT} --max-time 15 https://ifconfig.me")
+
+  echo "    remote direct egress : ${direct:-<none>}"
+  echo "    remote proxied egress: ${proxied:-<none>}"
+
+  if [ -z "$proxied" ]; then
+    echo "    FAIL — no response through proxy." >&2
+    exit 1
+  elif [ "$proxied" = "$direct" ]; then
+    echo "    FAIL — proxied egress equals direct egress; traffic is NOT using this machine." >&2
+    exit 1
+  else
+    echo "    OK — remote traffic exits via this machine's IP."
+  fi
+}
+
+# --- dispatch ---
+
+case "$CMD" in
+  up)     cmd_up ;;
+  down)   cmd_down ;;
+  status) cmd_status ;;
+  test)   cmd_test ;;
+  *)
+    echo "Usage: $0 [up|down|status|test]" >&2
+    exit 1
+    ;;
+esac
