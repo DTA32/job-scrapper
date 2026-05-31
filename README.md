@@ -203,6 +203,28 @@ merge runs — the image-baked `config.yaml` is used directly.
 > a rebuild and redeploy — editing `config.yaml` on a running container has no
 > effect.
 
+# How the filter works
+
+`filter:` in `config.yaml` runs **after** scraping — not at the HTTP/URL level.
+URL templates carry no location params. All search-page results are fetched and
+parsed first, then filtered in Python.
+
+Pipeline in `run_one` (`scraper/runner.py`):
+
+1. Fetch search page (full HTTP request)
+2. Parse all jobs from HTML
+3. Drop jobs older than `max_age_hours`
+4. **`apply_filter`** — drop jobs not matching `filter:` criteria
+5. Fetch detail pages — only for jobs that survived step 4
+6. Write output JSON
+
+`apply_filter` (`scraper/sites/_filter.py`) does case-insensitive substring
+matching per field. `location: [jakarta, tangerang]` keeps a job if
+`job["location"].lower()` contains any of those strings.
+
+Edge case: if a job's filtered field is `None` (site didn't return it), the
+job passes through — it is not dropped.
+
 # Cron job
 
 In the bot image, `supercronic` is the entrypoint, running
