@@ -67,3 +67,22 @@ def test_get_latest_run_converts_object_id_to_string():
     assert result is not None
     assert result["_id"] == "507f1f77bcf86cd799439011"
     assert result["foo"] == "bar"
+
+
+def test_ping_issues_admin_ping_command():
+    mock_client = MagicMock()
+    with patch.object(mongo_module, "_get_client", return_value=mock_client):
+        mongo_module.ping()
+    mock_client.admin.command.assert_called_once_with("ping")
+
+
+def test_ping_propagates_failure():
+    import pytest
+
+    mock_client = MagicMock()
+    mock_client.admin.command.side_effect = RuntimeError("no server")
+    with (
+        patch.object(mongo_module, "_get_client", return_value=mock_client),
+        pytest.raises(RuntimeError),
+    ):
+        mongo_module.ping()
