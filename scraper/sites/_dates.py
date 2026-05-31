@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, cast
 
 import dateparser
 
 _PARSER_SETTINGS: dict[str, Any] = {
     "RETURN_AS_TIMEZONE_AWARE": True,
-    "TIMEZONE": "UTC",
-    "TO_TIMEZONE": "UTC",
+    "TIMEZONE": "timezone.utc",
+    "TO_TIMEZONE": "timezone.utc",
     "PREFER_DATES_FROM": "past",
 }
 
@@ -21,14 +21,12 @@ def parse_to_iso(raw: str | None) -> str | None:
     cleaned = raw.strip()
     if not cleaned:
         return None
-    parsed = dateparser.parse(
-        cleaned, languages=_LANGUAGES, settings=cast(Any, _PARSER_SETTINGS)
-    )
+    parsed = dateparser.parse(cleaned, languages=_LANGUAGES, settings=cast(Any, _PARSER_SETTINGS))
     if parsed is None:
         return None
     if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=timezone.utc)
-    return parsed.astimezone(timezone.utc).isoformat()
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC).isoformat()
 
 
 def parse_to_datetime(raw: str | None) -> datetime | None:

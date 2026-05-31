@@ -1,6 +1,14 @@
 services:
 
-  # override: route proxy through host machine
+  # override: use pre-built image from ghcr.io; host networking gives access to
+  # localhost:1080 (reverse SSH proxy tunnel) and localhost:27017 (mongo published port).
+  # MONGO_URI must point to localhost (not 'mongo' DNS which is bridge-only).
   scraper-mcp:
+    image: ${MCP_IMAGE:-job-scraper-mcp:latest}
+    network_mode: host
     environment:
-      - PROXY_URL=socks5://host.docker.internal:1080
+      - MONGO_URI=mongodb://${MONGO_ROOT_USER:-admin}:${MONGO_ROOT_PASSWORD}@localhost:27017
+
+  # override: use pre-built image from ghcr.io
+  bot:
+    image: ${BOT_IMAGE:-job-scraper-bot:latest}

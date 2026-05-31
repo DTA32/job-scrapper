@@ -5,8 +5,8 @@ proxy: ~ # disabled in dev — use direct connection
 
 sites:
   jobstreet:
-    enabled: false
-    limit: 5
+    enabled: true
+    limit: 2
     url_template: "https://id.jobstreet.com/id/{keyword_slug}-jobs?daterange=1"
 
   glints:
@@ -20,6 +20,6 @@ sites:
     url_template: "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords={keyword}&location=Indonesia&f_TPR=r86400&start=0"
 
   indeed:
-    enabled: true
+    enabled: false
     limit: 2
     url_template: "https://id.indeed.com/jobs?q={keyword_plus}&l=Indonesia&fromage=1"

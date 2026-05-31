@@ -10,24 +10,45 @@ services:
       - ./output:/out
 
   # SERVICE: scraper — one-shot CLI scraper; network_mode:host for SOCKS5 proxy passthrough
-  scraper:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: scraper-cli
-    image: job-scraper:latest
-    container_name: job-scraper
-    restart: "no"
-    profiles: ["scraper"]
-    network_mode: host
-    depends_on:
-      output-init:
-        condition: service_completed_successfully
+  # Disabled, this is just to test if the scraper works independently
+  # scraper:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #     target: scraper-cli
+  #   image: job-scraper:latest
+  #   container_name: job-scraper
+  #   restart: "no"
+  #   profiles: ["scraper"]
+  #   network_mode: host
+  #   depends_on:
+  #     output-init:
+  #       condition: service_completed_successfully
+  #   volumes:
+  #     - ./config.yaml:/app/config.yaml:ro
+  #     - ./output:/app/output
+  #   environment:
+  #     - PROXY_URL=${PROXY_URL:-}
+
+  # SERVICE: mongo — persistent MongoDB store for scrape run history
+  mongo:
+    image: mongo:7
+    container_name: job-scraper-mongo
+    restart: unless-stopped
+    profiles: ["mcp", "mongo"]
+    ports:
+      - "127.0.0.1:27017:27017"
     volumes:
-      - ./config.yaml:/app/config.yaml:ro
-      - ./output:/app/output
+      - mongo-data:/data/db
     environment:
-      - PROXY_URL=${PROXY_URL:-}
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_ROOT_USER:-admin}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_ROOT_PASSWORD}
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')", "--quiet"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   # SERVICE: scraper-mcp — long-running MCP HTTP server; profile-gated so `docker compose up` skips it by default
   scraper-mcp:
@@ -42,12 +63,23 @@ services:
     depends_on:
       output-init:
         condition: service_completed_successfully
+      mongo:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     ports:
       - "8080:8080"
     volumes:
-      - ./config.yaml:/app/config.yaml
       - ./output:/app/output
       - ./docs:/app/docs:ro
+    environment:
+      - MONGO_URI=mongodb://${MONGO_ROOT_USER:-admin}:${MONGO_ROOT_PASSWORD}@mongo:27017
+      - MONGO_DB_NAME=${MONGO_DB_NAME:-job_scraper}
+      - MONGO_COLLECTION_NAME=${MONGO_COLLECTION_NAME:-scrape_runs}
 
   # SERVICE: bot — cron bot; runs claude-code on a schedule; profile-gated so `docker compose up` skips it by default
   bot:
@@ -67,8 +99,11 @@ services:
     environment:
       - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
       - DISCORD_CHANNEL_ID=${DISCORD_CHANNEL_ID}
+      - TZ=${TZ:-Asia/Jakarta}
     volumes:
-      - ~/.claude:/home/node/.claude
-      - ~/.claude.json:/home/node/.claude.json
-      - ./config.yaml:/workspace/config.yaml:ro
+      - ${CLAUDE_CONFIG_DIR:-~/.claude}:/home/node/.claude
+      - ${CLAUDE_CONFIG_FILE:-~/.claude.json}:/home/node/.claude.json
       - ./output:/workspace/output
+
+volumes:
+  mongo-data:

@@ -127,7 +127,7 @@ def _experience_level_from_candidate(candidate: dict) -> str | None:
         value = candidate.get(key)
         if isinstance(value, str) and value:
             return _normalize(value)
-    if isinstance(candidate.get("minYearsOfExperience"), (int, float)):
+    if isinstance(candidate.get("minYearsOfExperience"), int | float):
         years = int(candidate["minYearsOfExperience"])
         return f"{years}+ years"
     return None
@@ -197,9 +197,7 @@ class GlintsScraper(Scraper):
             job["location"] = str(location).strip() if location else None
             slug = candidate.get("slug") or candidate.get("id")
             job["job_id"] = str(slug) if slug else None
-            job["url"] = (
-                f"https://glints.com/id/opportunities/jobs/{slug}" if slug else None
-            )
+            job["url"] = f"https://glints.com/id/opportunities/jobs/{slug}" if slug else None
             job["salary"] = _salary_from_candidate(candidate)
             job["posted_date"] = _posted_date_from_candidate(candidate)
             job["work_type"] = _work_type_from_candidate(candidate)
@@ -226,20 +224,14 @@ class GlintsScraper(Scraper):
             title = title_el.get_text(" ", strip=True)
             container = anchor.find_parent()
             company_el = (
-                container.find(class_=re.compile(r"CompanyName", re.I))
-                if container
-                else None
+                container.find(class_=re.compile(r"CompanyName", re.I)) if container else None
             )
             loc_el = (
                 container.find(class_=re.compile(r"Location|Place|City", re.I))
                 if container
                 else None
             )
-            salary_el = (
-                container.find(class_=re.compile(r"Salary", re.I))
-                if container
-                else None
-            )
+            salary_el = container.find(class_=re.compile(r"Salary", re.I)) if container else None
             company = company_el.get_text(" ", strip=True) if company_el else None
             location = loc_el.get_text(" ", strip=True) if loc_el else None
             salary = salary_el.get_text(" ", strip=True) if salary_el else None

@@ -151,9 +151,7 @@ class JobstreetScraper(Scraper):
             job["location"] = str(location).strip() if location else None
             job_id = candidate.get("id")
             job["job_id"] = str(job_id) if job_id else None
-            job["url"] = (
-                f"https://id.jobstreet.com/id/job/{job_id}" if job_id else None
-            )
+            job["url"] = f"https://id.jobstreet.com/id/job/{job_id}" if job_id else None
             job["salary"] = _salary_from_candidate(candidate)
             job["posted_date"] = _posted_date_from_candidate(candidate)
             job["work_type"] = _work_type_from_candidate(candidate)
@@ -183,19 +181,11 @@ class JobstreetScraper(Scraper):
             location = loc_el.get_text(strip=True) if loc_el else None
             salary = salary_el.get_text(" ", strip=True) if salary_el else None
             posted_date = posted_el.get_text(" ", strip=True) if posted_el else None
-            work_type = (
-                work_type_el.get_text(" ", strip=True).lower()
-                if work_type_el
-                else None
-            )
+            work_type = work_type_el.get_text(" ", strip=True).lower() if work_type_el else None
 
             href_value = title_el.get("href") if title_el and title_el.name == "a" else None
             href = str(href_value) if href_value else None
-            url = (
-                f"https://id.jobstreet.com{href}"
-                if href and href.startswith("/")
-                else href
-            )
+            url = f"https://id.jobstreet.com{href}" if href and href.startswith("/") else href
 
             if title and company:
                 job = empty_job(self.name, title, company)

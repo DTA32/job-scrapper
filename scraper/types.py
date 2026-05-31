@@ -37,13 +37,9 @@ JOB_FIELD_ORDER: tuple[str, ...] = (
     "requirements",
 )
 
-CANONICAL_FIELDS: frozenset[str] = frozenset(
-    JOB_FIELD_ORDER
-)
+CANONICAL_FIELDS: frozenset[str] = frozenset(JOB_FIELD_ORDER)
 
-MANDATORY_FIELDS: frozenset[str] = frozenset(
-    {"site", "matched_keyword", "title", "company", "url"}
-)
+MANDATORY_FIELDS: frozenset[str] = frozenset({"site", "matched_keyword", "title", "company", "url"})
 
 
 def empty_job(site: str, title: str, company: str) -> Job:

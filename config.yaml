@@ -5,8 +5,8 @@ keywords:
   # - product owner
   # - quality assurance
   - data analyst
-  - content writer
-  - seo
+  # - content writer
+  # - seo
 
 limit: 3
 concurrency: 2
@@ -27,8 +27,9 @@ bot:
     Source: {site}
     Diposting: {posted_date}
 
-    **Requirements**:
-    {requirements}
+  # Use this inside "message_template" to display the requirements
+  # **Requirements**:
+  # {requirements}
 
 # jobs older than this are dropped; pair with URL param windows per site
 max_age_hours: 72

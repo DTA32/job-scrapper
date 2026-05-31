@@ -69,6 +69,14 @@ test-results/
 # Added by code-review-graph
 .code-review-graph/
 
+# Graphify artifacts
+.graphify_python
+graphify-out/
+
+# Local docs
+docs/bot-mcp-communication.md
+docs/workflow.excalidraw
+
 # Agent
 .claude/
 CLAUDE.md
@@ -79,3 +87,9 @@ CLAUDE.md
 .cursorrules
 AGENTS.md
 scripts/rev-socks.sh
+
+# Local SSH tunnel script (hardcodes server host/user) — copy from the .example
+scripts/ssh-tunnel.sh
+
+# Local dev config patch (personal overrides) — copy from the .example
+config.dev.patch.yaml
