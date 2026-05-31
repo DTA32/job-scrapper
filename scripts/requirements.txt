@@ -1,0 +1,8 @@
+# Dependencies to RUN the Docker manager TUI (scripts/manage.py).
+# Kept separate from the repo root requirements.txt, which is baked into the
+# Docker images — the TUI is a host-side dev tool and must not bloat them.
+#
+#   pip install -r scripts/requirements.txt
+#
+textual>=0.58
+pyyaml>=6.0
