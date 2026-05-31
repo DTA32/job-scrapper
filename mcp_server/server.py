@@ -14,6 +14,7 @@ from urllib.parse import urlparse, urlunparse
 
 import yaml
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-untyped]
+from starlette.concurrency import run_in_threadpool
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
@@ -42,7 +43,16 @@ mcp = FastMCP("job-scraper", host=HOST, port=PORT)
 
 @mcp.custom_route("/health", methods=["GET"])
 async def health_check(request: Request) -> Response:
-    return JSONResponse({"status": "ok"})
+    # Readiness probe: report Mongo reachability. pymongo is blocking, so run
+    # the ping off the event loop. Keep the error out of the body (8080 is
+    # host-exposed) and log it server-side instead.
+    try:
+        await run_in_threadpool(mongo.ping)
+    except Exception as exc:  # unreachable / selection timeout / op failure
+        log = _get_logger()
+        log.warning("health check: mongo ping failed: %s", exc)
+        return JSONResponse({"status": "degraded", "mongo": "error"}, status_code=503)
+    return JSONResponse({"status": "ok", "mongo": "ok"})
 
 
 def _load_config(path: Path) -> AppConfig:
