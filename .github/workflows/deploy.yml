@@ -94,89 +94,95 @@ jobs:
     needs: build-mcp
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
+      - name: Ensure deploy dir
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: mkdir -p ~/job-scrapper
+
+      - name: Copy compose files
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "docker-compose.yml,docker-compose.prod.yml"
+          target: "~/job-scrapper"
+
       - name: Deploy scraper-mcp
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          envs: IMAGE_TAG,CONTAINER_NAME
+          envs: MCP_IMAGE,MONGO_ROOT_USER,MONGO_ROOT_PASSWORD,MONGO_DB_NAME,MONGO_COLLECTION_NAME
           script: |
-            # fail fast: exit on error, unset vars, or pipe failure
             set -euo pipefail
+            cd ~/job-scrapper
 
-            # pull the newly-built image before touching the running container
-            docker pull "$IMAGE_TAG"
+            # one-time migration: remove legacy docker run container (different name, same port)
+            docker rm -f scraper-mcp 2>/dev/null || true
 
-            # tear down the old container so the new one can take its place
-            docker stop "$CONTAINER_NAME" || true
-            docker rm "$CONTAINER_NAME" || true
-
-            # safety net: kill any container still holding port 8080 under a different name
-            STALE=$(docker ps --filter "publish=8080" --format "{{.ID}}")
-            if [ -n "$STALE" ]; then
-              echo "Removing stale container(s) on port 8080: $STALE"
-              echo "$STALE" | xargs -r docker rm -f
-            fi
-
-            # --network host + -p 8080:8080: exposes the MCP HTTP server to the host
-            # PROXY_URL is optional; defaults to empty if the secret is unset
-            docker run -d \
-              --name "$CONTAINER_NAME" \
-              --network host \
-              --restart unless-stopped \
-              -p 8080:8080 \
-              -e PROXY_URL="${PROXY_URL:-}" \
-              "$IMAGE_TAG"
-
-            # confirm the container came up
-            docker ps --filter "name=$CONTAINER_NAME"
+            C="docker compose -f docker-compose.yml -f docker-compose.prod.yml"
+            $C --profile mcp pull
+            $C --profile mcp up -d --no-build
+            $C ps
         env:
-          IMAGE_TAG: ${{ needs.build-mcp.outputs.image_tag_sha }}
-          CONTAINER_NAME: scraper-mcp
+          MCP_IMAGE: ${{ needs.build-mcp.outputs.image_tag_sha }}
+          MONGO_ROOT_USER: ${{ vars.MONGO_ROOT_USER || 'admin' }}
+          MONGO_ROOT_PASSWORD: ${{ secrets.MONGO_ROOT_PASSWORD }}
+          MONGO_DB_NAME: ${{ vars.MONGO_DB_NAME || 'job_scraper' }}
+          MONGO_COLLECTION_NAME: ${{ vars.MONGO_COLLECTION_NAME || 'scrape_runs' }}
 
   deploy-bot:
     needs: [build-bot, deploy-mcp]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
+      - name: Ensure deploy dir
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: mkdir -p ~/job-scrapper
+
+      - name: Copy compose files
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "docker-compose.yml,docker-compose.prod.yml"
+          target: "~/job-scrapper"
+
       - name: Deploy scraper-bot
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          envs: IMAGE_TAG,CONTAINER_NAME,CLAUDE_CONFIG_DIR,CLAUDE_CONFIG_FILE,DISCORD_BOT_TOKEN,DISCORD_CHANNEL_ID,TZ
+          envs: BOT_IMAGE,DISCORD_BOT_TOKEN,DISCORD_CHANNEL_ID,CLAUDE_CONFIG_DIR,CLAUDE_CONFIG_FILE,TZ
           script: |
-            # fail fast: exit on error, unset vars, or pipe failure
             set -euo pipefail
+            cd ~/job-scrapper
 
-            # pull the newly-built image before touching the running container
-            docker pull "$IMAGE_TAG"
+            # one-time migration: remove legacy docker run container (different name)
+            docker rm -f scraper-bot 2>/dev/null || true
 
-            # tear down the old container so the new one can take its place
-            docker stop "$CONTAINER_NAME" || true
-            docker rm "$CONTAINER_NAME" || true
-
-            # --add-host: lets the container reach host-side services (MCP server on localhost:8080)
-            # -v mounts: Claude credentials and config come from the host so they survive redeploys
-            docker run -d \
-              --name "$CONTAINER_NAME" \
-              --restart unless-stopped \
-              --add-host=host.docker.internal:host-gateway \
-              -v "$CLAUDE_CONFIG_DIR:/home/node/.claude" \
-              -v "$CLAUDE_CONFIG_FILE:/home/node/.claude.json" \
-              -e DISCORD_BOT_TOKEN="$DISCORD_BOT_TOKEN" \
-              -e DISCORD_CHANNEL_ID="$DISCORD_CHANNEL_ID" \
-              -e TZ="$TZ" \
-              "$IMAGE_TAG"
-
-            # confirm the container came up
-            docker ps --filter "name=$CONTAINER_NAME"
+            C="docker compose -f docker-compose.yml -f docker-compose.prod.yml"
+            $C --profile bot pull
+            $C --profile bot up -d --no-build
+            $C ps
         env:
-          IMAGE_TAG: ${{ needs.build-bot.outputs.image_tag_sha }}
-          CONTAINER_NAME: scraper-bot
-          CLAUDE_CONFIG_DIR: ${{ vars.CLAUDE_CONFIG_DIR }}
-          CLAUDE_CONFIG_FILE: ${{ vars.CLAUDE_CONFIG_FILE }}
+          BOT_IMAGE: ${{ needs.build-bot.outputs.image_tag_sha }}
           DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
           DISCORD_CHANNEL_ID: ${{ secrets.DISCORD_CHANNEL_ID }}
+          CLAUDE_CONFIG_DIR: ${{ vars.CLAUDE_CONFIG_DIR }}
+          CLAUDE_CONFIG_FILE: ${{ vars.CLAUDE_CONFIG_FILE }}
           TZ: ${{ vars.TZ || 'Asia/Jakarta' }}

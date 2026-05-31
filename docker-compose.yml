@@ -74,7 +74,6 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - ./config.yaml:/app/config.yaml
       - ./output:/app/output
       - ./docs:/app/docs:ro
     environment:
@@ -100,10 +99,10 @@ services:
     environment:
       - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
       - DISCORD_CHANNEL_ID=${DISCORD_CHANNEL_ID}
+      - TZ=${TZ:-Asia/Jakarta}
     volumes:
-      - ~/.claude:/home/node/.claude
-      - ~/.claude.json:/home/node/.claude.json
-      - ./config.yaml:/workspace/config.yaml:ro
+      - ${CLAUDE_CONFIG_DIR:-~/.claude}:/home/node/.claude
+      - ${CLAUDE_CONFIG_FILE:-~/.claude.json}:/home/node/.claude.json
       - ./output:/workspace/output
 
 volumes:
