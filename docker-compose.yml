@@ -1,10 +1,10 @@
 services:
   # SERVICE: output-init — fixes output dir ownership before scraper runs (Playwright image runs as root)
   output-init:
-    image: mcr.microsoft.com/playwright/python:v1.59.0-jammy
+    image: mcr.microsoft.com/playwright/python:v1.59.0-noble
     container_name: job-scraper-init
     user: "0:0"
-    entrypoint: ["sh", "-c", "chown -R 1000:1000 /out"]
+    entrypoint: ["sh", "-c", "chown -R pwuser:pwuser /out"]
     restart: "no"
     volumes:
       - ./output:/out
