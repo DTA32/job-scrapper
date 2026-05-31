@@ -1,4 +1,4 @@
-ARG PLAYWRIGHT_VERSION=v1.59.0-jammy
+ARG PLAYWRIGHT_VERSION=v1.59.0-noble
 
 
 # =============================================================================
