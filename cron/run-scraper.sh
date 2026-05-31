@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # Cron entrypoint: runs claude-code with a markdown prompt, logs all output
 LOG=/workspace/scraper-bot/cron/scraper.log
 PROMPT=/workspace/scraper-bot/prompts/scrape-and-post.md

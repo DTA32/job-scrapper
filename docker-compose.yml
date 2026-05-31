@@ -35,7 +35,7 @@ services:
     image: mongo:7
     container_name: job-scraper-mongo
     restart: unless-stopped
-    profiles: ["mcp"]
+    profiles: ["mcp", "mongo"]
     ports:
       - "127.0.0.1:27017:27017"
     volumes:
