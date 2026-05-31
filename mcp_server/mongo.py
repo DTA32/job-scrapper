@@ -5,8 +5,8 @@ from datetime import UTC, datetime
 from typing import Any
 
 MONGO_URI = os.environ.get("MONGO_URI", "mongodb://localhost:27017")
-_DB_NAME = "job_scraper"
-_COLLECTION_NAME = "scrape_runs"
+_DB_NAME = os.environ.get("MONGO_DB_NAME", "job_scraper")
+_COLLECTION_NAME = os.environ.get("MONGO_COLLECTION_NAME", "scrape_runs")
 
 _client: Any = None
 

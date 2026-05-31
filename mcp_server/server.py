@@ -14,6 +14,8 @@ from urllib.parse import urlparse, urlunparse
 
 import yaml
 from mcp.server.fastmcp import FastMCP  # type: ignore[import-untyped]
+from starlette.requests import Request
+from starlette.responses import JSONResponse, Response
 
 from mcp_server import mongo
 from scraper.config import ACCEPT_LANGUAGE, USER_AGENT
@@ -36,6 +38,11 @@ _STATUS_PATH = Path("logs/status.json")
 _LOG_PATH = Path("logs/scraper.log")
 
 mcp = FastMCP("job-scraper", host=HOST, port=PORT)
+
+
+@mcp.custom_route("/health", methods=["GET"])
+async def health_check(request: Request) -> Response:
+    return JSONResponse({"status": "ok"})
 
 
 def _load_config(path: Path) -> AppConfig:
