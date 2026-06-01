@@ -163,12 +163,10 @@ class GlintsScraper(Scraper):
         return None
 
     def parse(self, html: str) -> list[Job]:
-        results: list[Job] = []
-        results.extend(self._parse_next_data(html))
-        if len(results) >= self.limit:
-            return results[: self.limit]
-        results.extend(self._parse_html(html, skip=len(results)))
-        return results[: self.limit]
+        results = self._parse_next_data(html)
+        if results:
+            return results
+        return self._parse_html(html)
 
     def _parse_next_data(self, html: str) -> list[Job]:
         data = extract_next_data(html)
@@ -205,11 +203,9 @@ class GlintsScraper(Scraper):
             job["experience_level"] = _experience_level_from_candidate(candidate)
 
             results.append(job)
-            if len(results) >= self.limit:
-                break
         return results
 
-    def _parse_html(self, html: str, skip: int) -> list[Job]:
+    def _parse_html(self, html: str) -> list[Job]:
         soup = BeautifulSoup(html, "lxml")
         anchors = soup.select("a[href*='/opportunities/jobs/']")
         seen_urls: set[str] = set()
@@ -242,6 +238,4 @@ class GlintsScraper(Scraper):
                 job["url"] = url
                 job["salary"] = salary
                 results.append(job)
-                if len(results) + skip >= self.limit:
-                    break
         return results

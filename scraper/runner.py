@@ -17,7 +17,7 @@ from .fetchers import (
 from .log import get_logger
 from .sites import SCRAPERS, Scraper
 from .sites._dates import parse_to_iso
-from .sites._filter import apply_filter, project_jobs
+from .sites._filter import filter_reason, project_jobs
 from .types import Job
 
 _LOG = get_logger()
@@ -140,29 +140,51 @@ def run_one(
     if max_age_hours is not None:
         cutoff = datetime.now(UTC) - timedelta(hours=max_age_hours)
         before = len(jobs)
-        jobs = [j for j in jobs if _within_max_age(j, cutoff)]
-        dropped = before - len(jobs)
+        recent: list[Job] = []
+        for job in jobs:
+            if _within_max_age(job, cutoff):
+                recent.append(job)
+            else:
+                _LOG.debug(
+                    "[%s] drop stale: %r posted_at=%s < cutoff=%s",
+                    label,
+                    job.get("title"),
+                    job.get("posted_at"),
+                    cutoff.isoformat(),
+                )
+        jobs = recent
         _LOG.info(
-            "[%s] max_age=%dh kept %d/%d (dropped %d)",
+            "[%s] max_age=%dh cutoff=%s kept %d/%d (dropped %d stale)",
             label,
             max_age_hours,
+            cutoff.isoformat(),
             len(jobs),
             before,
-            dropped,
+            before - len(jobs),
         )
 
     if content_filter:
         before = len(jobs)
-        jobs = apply_filter(jobs, content_filter)
-        dropped = before - len(jobs)
+        matched: list[Job] = []
+        for job in jobs:
+            reason = filter_reason(job, content_filter)
+            if reason is None:
+                matched.append(job)
+            else:
+                _LOG.debug("[%s] drop filter: %r %s", label, job.get("title"), reason)
+        jobs = matched
         _LOG.info(
             "[%s] filter=%s kept %d/%d (dropped %d)",
             label,
             content_filter,
             len(jobs),
             before,
-            dropped,
+            before - len(jobs),
         )
+
+    if len(jobs) > scraper.limit:
+        _LOG.info("[%s] capping %d job(s) to limit=%d", label, len(jobs), scraper.limit)
+        jobs = jobs[: scraper.limit]
 
     _fetch_requirements(jobs, fields, fetcher, scraper)
 

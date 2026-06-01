@@ -49,6 +49,7 @@ def test_run_one_skips_bail_for_indeed_style_scraper(tmp_path: Path):
     scraper.name = "indeed"
     scraper.url = "https://id.indeed.com/jobs?q=x"
     scraper.requires_search_html = False
+    scraper.limit = 10
     fake_job = {
         "site": "indeed",
         "matched_keyword": "data analyst",

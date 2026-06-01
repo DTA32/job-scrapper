@@ -4,6 +4,13 @@ The `filter:` block in `config.yaml` drops jobs from the output before they
 reach the JSON files. It runs after the recency filter (`max_age_hours`) and
 before fields are projected for output.
 
+> **Ordering:** for `linkedin`, `glints`, and `jobstreet`, both `filter:` and
+> `max_age_hours` run **before** the per-site `limit` cap, so `limit` means "up
+> to N jobs *after* filtering" — you reliably get up to N matches, not the first
+> N parsed (which were often filtered down to zero). With no filter set,
+> behavior is unchanged (still the first N). `indeed` caps at the API and is
+> unaffected.
+
 ## Quick reference
 
 ```yaml

@@ -75,6 +75,4 @@ class LinkedinScraper(Scraper):
                 job["posted_date"] = posted_date
                 job["job_id"] = _extract_job_id(url)
                 results.append(job)
-                if len(results) >= self.limit:
-                    break
         return results

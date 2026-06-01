@@ -116,12 +116,10 @@ class JobstreetScraper(Scraper):
         return None
 
     def parse(self, html: str) -> list[Job]:
-        results: list[Job] = []
-        results.extend(self._parse_next_data(html))
-        if len(results) >= self.limit:
-            return results[: self.limit]
-        results.extend(self._parse_html(html, skip=len(results)))
-        return results[: self.limit]
+        results = self._parse_next_data(html)
+        if results:
+            return results
+        return self._parse_html(html)
 
     def _parse_next_data(self, html: str) -> list[Job]:
         data = extract_next_data(html)
@@ -158,11 +156,9 @@ class JobstreetScraper(Scraper):
             job["employment_type"] = _employment_type_from_candidate(candidate)
 
             results.append(job)
-            if len(results) >= self.limit:
-                break
         return results
 
-    def _parse_html(self, html: str, skip: int) -> list[Job]:
+    def _parse_html(self, html: str) -> list[Job]:
         soup = BeautifulSoup(html, "lxml")
         cards = soup.select(
             "article[data-card-type='JobCard'], article[data-automation='normalJob']"
@@ -195,6 +191,4 @@ class JobstreetScraper(Scraper):
                 job["posted_date"] = posted_date
                 job["work_type"] = work_type
                 results.append(job)
-                if len(results) + skip >= self.limit:
-                    break
         return results
