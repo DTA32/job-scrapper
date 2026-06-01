@@ -1,4 +1,4 @@
-# Multi-site job scraper
+# Multi-site job scrape
 
 ## Step 1 — Run the scraper
 

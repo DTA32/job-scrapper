@@ -219,3 +219,8 @@ def build_test(test: str) -> list[Command]:
             )
         ]
     raise ValueError(f"unknown test: {test!r}")
+
+
+def build_scrape_site(site: str) -> list[Command]:
+    """Scrape one platform: docker exec job-scraper-mcp python -m scraper <site>."""
+    return [Command(["docker", "exec", _MCP_CONTAINER, "python", "-m", "scraper", site])]
