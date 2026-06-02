@@ -35,7 +35,7 @@ bot:
 max_age_hours: 72
 
 filter:
-  location: [jakarta, tangerang, bandung, bekasi]
+  location: [jakarta, tangerang, bandung, bekasi, Indonesia]
   # employment_type: [full-time, internship, contract, part-time]
   # work_type: [remote, hybrid, onsite]
 

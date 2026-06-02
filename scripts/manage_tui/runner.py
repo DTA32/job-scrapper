@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import asyncio
 import os
+import shutil
+import subprocess
 from collections.abc import Callable
 
 from .commands import Command
@@ -73,7 +75,30 @@ class SequenceRunner:
         try:
             if command.stdout_path is not None:
                 # held open across the await; closed in the finally below
-                stdout_file = open(command.stdout_path, "wb")  # noqa: SIM115
+                try:
+                    stdout_file = open(command.stdout_path, "wb")  # noqa: SIM115
+                except IsADirectoryError:
+                    removed = False
+                    try:
+                        shutil.rmtree(command.stdout_path)
+                        removed = True
+                    except PermissionError:
+                        res = subprocess.run(
+                            ["sudo", "-n", "rm", "-rf", command.stdout_path],
+                            capture_output=True,
+                        )
+                        removed = res.returncode == 0
+                    if not removed:
+                        on_line(
+                            f"x {command.stdout_path} is a root-owned directory"
+                            f" (Docker created it). Fix: sudo rm -rf {command.stdout_path}"
+                        )
+                        return 1
+                    try:
+                        stdout_file = open(command.stdout_path, "wb")  # noqa: SIM115
+                    except Exception as exc:
+                        on_line(f"x cannot open stdout path after cleanup: {exc}")
+                        return 1
                 proc = await asyncio.create_subprocess_exec(
                     *command.argv,
                     cwd=REPO_ROOT,
