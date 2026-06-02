@@ -139,6 +139,7 @@ def _fetch_jobs_from_api(keyword: str, where: str, limit: int) -> list[dict]:
         radius=_DEFAULT_RADIUS_MILES,
         limit=max(1, min(limit, 100)),
     )
+    _LOG.info("[indeed-api] POST %s keyword=%r where=%r", _INDEED_API_URL, keyword, where)
     try:
         response = cffi_requests.post(
             _INDEED_API_URL,
