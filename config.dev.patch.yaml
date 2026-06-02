@@ -1,5 +1,6 @@
 keywords:
-  - data analyst
+  - back end engineer
+  # - data analyst
 
 proxy: ~ # disabled in dev — use direct connection
 
@@ -10,16 +11,16 @@ sites:
     url_template: "https://id.jobstreet.com/id/{keyword_slug}-jobs?daterange=1"
 
   glints:
-    enabled: false
-    limit: 3
+    enabled: true
+    limit: 2
     url_template: "https://glints.com/id/opportunities/jobs/explore?keyword={keyword}&country=ID"
 
   linkedin:
-    enabled: false
+    enabled: true
     limit: 2
     url_template: "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords={keyword}&location=Indonesia&f_TPR=r86400&start=0"
 
   indeed:
-    enabled: false
+    enabled: true
     limit: 2
     url_template: "https://id.indeed.com/jobs?q={keyword_plus}&l=Indonesia&fromage=1"
