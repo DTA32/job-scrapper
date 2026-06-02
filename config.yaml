@@ -54,12 +54,12 @@ sites:
   jobstreet:
     enabled: true
     limit: 3
-    url_template: "https://id.jobstreet.com/id/{keyword_slug}-jobs?daterange=1"
+    url_template: "https://id.jobstreet.com/id/{keyword_slug}-jobs?daterange=1&sortmode=ListedDate"
 
   glints:
     enabled: true
     limit: 3
-    url_template: "https://glints.com/id/opportunities/jobs/explore?keyword={keyword}&country=ID"
+    url_template: "https://glints.com/id/opportunities/jobs/explore?keyword={keyword}&country=ID&sortBy=LATEST"
     fields:
       - title
       - company
@@ -75,7 +75,8 @@ sites:
   linkedin:
     enabled: true
     limit: 3
-    url_template: "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords={keyword}&location=Indonesia&f_TPR=r86400&start=0"
+    # guest API ignores sortBy=DD (verified); f_TPR is the real recency lever. Kept for convention.
+    url_template: "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords={keyword}&location=Indonesia&f_TPR=r86400&sortBy=DD&start=0"
     fields:
       - title
       - company
