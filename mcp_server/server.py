@@ -643,10 +643,13 @@ def scrape_jobs(
     target_sites = list(sites) if sites else list(config.enabled_site_names())
     target_keywords = list(keywords) if keywords else list(config.keywords)
 
-    exit_code = run_scraper(config, targets=target_sites, keywords=target_keywords)
+    # run scraper — writes per-site JSON output files
+    exit_code: int = run_scraper(config, targets=target_sites, keywords=target_keywords)
 
+    # read output files: collect raw payloads for Mongo, normalize for response
     results: list[dict[str, Any]] = []
     errors: list[dict[str, str]] = []
+    raw_results: list[dict[str, Any]] = []
     for keyword in target_keywords:
         per_site: list[dict[str, Any]] = []
         for name in target_sites:
@@ -660,6 +663,7 @@ def scrape_jobs(
                     }
                 )
                 continue
+            raw_results.append({"keyword": keyword, "site": name, "payload": payload})
             if isinstance(payload, dict) and "error" in payload:
                 err: dict[str, Any] = {
                     "keyword": keyword,
@@ -696,7 +700,25 @@ def scrape_jobs(
         duration,
     )
 
+    # persist run status to disk; insert raw results to Mongo (best-effort)
     _write_status(result, duration)
+
+    try:
+        inserted_id = mongo.insert_run(
+            {
+                "run_metadata": {
+                    "ok": result["ok"],
+                    "exit_code": exit_code,
+                    "keywords": target_keywords,
+                    "requested_sites": target_sites,
+                    "errors": errors,
+                },
+                "raw_results": raw_results,
+            }
+        )
+        log.info("scrape_jobs: mongo raw insert ok id=%s", inserted_id)
+    except Exception as exc:
+        log.error("scrape_jobs: mongo raw insert failed: %s", exc)
 
     return result
 
