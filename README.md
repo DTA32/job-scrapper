@@ -115,6 +115,15 @@ Compose wiring that makes this work:
 `.env` is for local Docker Compose only. Production injects all env vars through
 GitHub Actions secrets/variables — it never reads this file.
 
+**MongoDB connection URL:** the app reads `MONGO_URI` (`mcp_server/mongo.py`). You
+don't set it directly — Docker Compose derives it from `MONGO_ROOT_USER` +
+`MONGO_ROOT_PASSWORD`:
+
+- dev / bridge network (`docker-compose.yml`): `mongodb://<user>:<password>@mongo:27017`
+- prod / host network (`docker-compose.prod.yml`): `mongodb://<user>:<password>@localhost:27017`
+
+Outside Docker the code default is `mongodb://localhost:27017`.
+
 # SSH tunnel (reverse SOCKS proxy)
 
 `scripts/ssh-tunnel.sh` opens a **reverse dynamic SOCKS5** tunnel (`ssh -R`) so
@@ -136,14 +145,73 @@ cp scripts/ssh-tunnel.sh.example scripts/ssh-tunnel.sh
 Commands:
 
 ```bash
-./scripts/ssh-tunnel.sh up      # open the reverse SOCKS proxy
-./scripts/ssh-tunnel.sh down    # close it
-./scripts/ssh-tunnel.sh status  # proxy liveness + docker ps on remote
-./scripts/ssh-tunnel.sh test    # verify remote traffic exits via this machine's IP
+./scripts/ssh-tunnel.sh up           # open the reverse SOCKS proxy
+./scripts/ssh-tunnel.sh down         # close it
+./scripts/ssh-tunnel.sh status       # proxy + mongo tunnel liveness + docker ps
+./scripts/ssh-tunnel.sh test         # verify remote traffic exits via this machine's IP
+./scripts/ssh-tunnel.sh mongo-up     # forward local :27018 → remote MongoDB
+./scripts/ssh-tunnel.sh mongo-down   # close the mongo forward tunnel
+./scripts/ssh-tunnel.sh mongo-status # show mongo tunnel liveness
+./scripts/ssh-tunnel.sh mongo-test   # verify port reachable + mongosh ping
+./scripts/ssh-tunnel.sh mongo-reset  # reset remote mongo root password (see below)
 ```
 
 The `test` command confirms the proxied egress IP differs from the server's
 direct egress IP. If they match, the tunnel is not working.
+
+## Connecting to prod MongoDB from local machine
+
+Prod MongoDB binds to `127.0.0.1:27017` on the server — not exposed publicly.
+Use `mongo-up` to open a forward tunnel, then connect normally:
+
+```bash
+./scripts/ssh-tunnel.sh mongo-up
+mongosh "mongodb://admin:<MONGO_ROOT_PASSWORD>@127.0.0.1:27018"
+```
+
+Any client connecting from outside the server (DataGrip, DBeaver, Compass, Python scripts)
+must go through the tunnel the same way — run `mongo-up` first, then connect using
+`mongodb://<user>:<password>@127.0.0.1:27018`. Verify with `mongo-test`:
+
+```bash
+./scripts/ssh-tunnel.sh mongo-up
+./scripts/ssh-tunnel.sh mongo-test
+```
+
+Default local port is `27018` (not `27017`) to avoid conflict with a running dev
+mongo container. Override if needed:
+
+```bash
+MONGO_PORT=27019 ./scripts/ssh-tunnel.sh mongo-up
+```
+
+### "Authentication failed" against prod mongo
+
+If `mongo-test` reports auth failure (and `job-scraper-mcp` shows `unhealthy`)
+even though `MONGO_ROOT_PASSWORD` looks correct, the volume was **first**
+initialized with different creds. `MONGO_INITDB_ROOT_USERNAME` / `_PASSWORD`
+only apply on the **first** mongod start against an **empty** `mongo-data`
+volume — once data exists, mongod stores creds in the volume and ignores those
+env vars forever. So changing the GitHub secret and redeploying has **no
+effect** on the password.
+
+Fix in place (keeps data) — reset the stored password to `MONGO_ROOT_PASSWORD`:
+
+```bash
+./scripts/ssh-tunnel.sh mongo-reset
+```
+
+This SSHes in, stops the authed mongo, boots a throwaway no-auth mongo on the
+same volume, sets the `admin` password, then restarts the real container (a
+`trap` restarts it even if a step fails). Re-run `mongo-test` to confirm.
+
+Alternative (clean slate, **loses scrape history**): remove the container +
+volume so the next start re-initializes from current env:
+
+```bash
+docker rm -f job-scraper-mongo && docker volume rm job-scrapper_mongo-data
+# then redeploy, or `docker compose ... --profile mcp up -d`
+```
 
 # Deployment process
 
@@ -250,6 +318,32 @@ so it idles and does not run cron. To fire a run manually:
 
 # Or directly:
 docker exec job-scraper-bot /bin/sh /workspace/scraper-bot/cron/run-scraper.sh
+```
+
+# Query MongoDB data
+
+Connect to the Mongo shell:
+
+```bash
+docker exec -it job-scraper-mongo mongosh -u admin -p <MONGO_ROOT_PASSWORD> --authenticationDatabase admin
+```
+
+Then query the scrape history:
+
+```js
+use job_scraper
+
+// all runs
+db.scrape_runs.find({})
+
+// latest first
+db.scrape_runs.find({}).sort({ _id: -1 })
+
+// count
+db.scrape_runs.countDocuments()
+
+// latest single run
+db.scrape_runs.findOne({}, {}, { sort: { _id: -1 } })
 ```
 
 # Check logs
