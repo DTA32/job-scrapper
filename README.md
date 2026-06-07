@@ -346,6 +346,32 @@ db.scrape_runs.countDocuments()
 db.scrape_runs.findOne({}, {}, { sort: { _id: -1 } })
 ```
 
+# Clear / reset MongoDB data
+
+⚠️ **Irreversible.** In MongoDB, columns (fields) live on the documents, not in a
+fixed schema — deleting the documents removes the old fields with them. After a
+wipe, only the columns the current code writes reappear on the next run.
+
+Connect to the Mongo shell (same `docker exec … mongosh` as
+[Query MongoDB data](#query-mongodb-data)), then:
+
+```js
+use job_scraper
+
+// empty the collection — keeps it and its indexes (recommended)
+db.scrape_runs.deleteMany({})
+
+// or drop the collection (removes documents + indexes)
+db.scrape_runs.drop()
+
+// or drop the whole database
+db.dropDatabase()
+```
+
+For **prod**, open the SSH tunnel first (see
+[Connecting to prod MongoDB from local machine](#connecting-to-prod-mongodb-from-local-machine)),
+then run the same commands.
+
 # Check logs
 
 Stream container logs:

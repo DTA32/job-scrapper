@@ -23,7 +23,8 @@ The response shape is:
     },
     ...
   ],
-  "errors": [{"keyword": "...", "site": "...", "reason": "..."}]
+  "errors": [{"keyword": "...", "site": "...", "reason": "..."}],
+  "mongo_id": "<MongoDB _id of this run's document, or null if Mongo was unreachable>"
 }
 ```
 
@@ -117,44 +118,38 @@ Scraped {total_jobs} jobs across {len(keywords)} keyword(s) and
 
 Skip this footer if `total_jobs == 0` (the run produced nothing useful).
 
-## Step 6 — Record the run in MongoDB
+## Step 6 — Record the Discord outcome in MongoDB
 
-After sending the summary footer (or immediately after posting all job messages if
-`total_jobs == 0`), call the `job-scraper` MCP tool `insert_scrape_run` with a
-single `run_data` argument assembled as follows:
+`scrape_jobs` already stored this run (raw + filtered results, per-site counts).
+Your job here is only to add the Discord columns to that **same** document.
+
+If `mongo_id` from Step 1 is null, skip this step (Mongo was unreachable; job
+posting already happened and takes priority).
+
+Otherwise call the `job-scraper` MCP tool `update_scrape_run` with:
 
 ```json
 {
-  "run_metadata": {
-    "ok": "<bool — top-level ok from scrape_jobs>",
-    "exit_code": "<int>",
-    "keywords": ["..."],
-    "requested_sites": ["..."],
-    "errors": ["..."]
-  },
-  "per_site_counts": {
-    "<site_name>": { "<keyword>": "<count_int>" }
-  },
-  "raw_results": "<the full results array from scrape_jobs>",
-  "bot_post_status": {
-    "total_posted": "<number of Discord messages sent successfully>",
-    "failed": "<number that errored or got a non-2xx response>"
+  "run_id": "<mongo_id from Step 1>",
+  "patch": {
+    "channel_id": "<value of DISCORD_CHANNEL_ID>",
+    "discord_sent_status": "<'success' if no posts failed, else 'failed'>",
+    "run_metadata.bot_post_status": {
+      "total_posted": "<number of Discord messages sent successfully>",
+      "failed": "<number that errored or got a non-2xx response>"
+    }
   }
 }
 ```
 
-`per_site_counts` is derived from `results[*].sites[*]`:
-
-```js
-// pseudocode
-for each keyword_group in results:
-  for each site_entry in keyword_group.sites:
-    per_site_counts[site_entry.site][keyword_group.keyword] = site_entry.count
-```
-
-If `insert_scrape_run` returns `{ok: false}`, print one diagnostic line
-(`MongoDB insert failed: <error>`) but do **not** retry or abort — job posting
-always takes priority over history recording.
+Notes:
+- `discord_sent_status` is `"success"` when `failed == 0` (including when there
+  were no jobs to post), else `"failed"`.
+- Store `channel_id` only — **never** put `DISCORD_BOT_TOKEN` in the patch.
+- The `"run_metadata.bot_post_status"` dot-notation key updates the nested field
+  without overwriting the rest of `run_metadata`.
+- If `update_scrape_run` returns `{ok: false}`, print one diagnostic line
+  (`MongoDB update failed: <error>`) but do **not** retry or abort.
 
 ## Notes
 

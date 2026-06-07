@@ -69,6 +69,37 @@ def _read_site_output(config: AppConfig, keyword: str, name: str) -> dict[str, A
         return None
 
 
+def _read_site_raw_output(config: AppConfig, keyword: str, name: str) -> dict[str, Any] | None:
+    path = config.output_dir / keyword_slug(keyword) / f"{name}.raw.json"
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text())
+    except json.JSONDecodeError:
+        return None
+
+
+def _build_per_site_counts(results: list[dict[str, Any]]) -> dict[str, dict[str, int]]:
+    counts: dict[str, dict[str, int]] = {}
+    for group in results:
+        keyword = group["keyword"]
+        for site_entry in group.get("sites", []):
+            counts.setdefault(site_entry["site"], {})[keyword] = site_entry.get("count", 0)
+    return counts
+
+
+def _build_note(errors: list[dict[str, Any]]) -> str | None:
+    """Human-readable failure summary, or None when the run had no errors.
+
+    Covers scrape failures and proxy failures alike — a dead proxy surfaces as
+    per-(keyword,site) fetch errors, which land in ``errors``.
+    """
+    if not errors:
+        return None
+    reasons = "; ".join(f"{e.get('site', '?')}: {e.get('reason', 'unknown')}" for e in errors)
+    return f"scrape failed — {reasons}"
+
+
 def _deep_merge(base: dict, patch: dict) -> dict:
     result = deepcopy(base)
     for key, value in patch.items():
@@ -332,6 +363,7 @@ def get_scrape_response_structure() -> dict[str, Any]:
             "exit_code",
             "results",
             "errors",
+            "mongo_id",
         ],
         "site_result_fields": [
             "site",
@@ -471,10 +503,13 @@ def insert_scrape_run(run_data: dict[str, Any]) -> dict[str, Any]:
 
     Args:
         run_data: Arbitrary dict with run details. Recommended keys:
-            run_metadata: {ok, exit_code, keywords, requested_sites, errors}
-            per_site_counts: {<site>: {<keyword>: <count>}}
-            raw_results: full results array from scrape_jobs
-            bot_post_status: {total_posted, failed}
+            run_metadata: {ok, exit_code, keywords, requested_sites, errors,
+                           per_site_counts, bot_post_status}
+            filtered_results: per-site filtered/projected jobs
+            raw_results: per-site unfiltered jobs (only the site's query params)
+            note: failure summary string, or null
+            channel_id: Discord channel id (never the bot token)
+            discord_sent_status: "success" | "failed"
 
     Returns:
         On success: {ok: true, inserted_id: <str>}
@@ -494,8 +529,8 @@ def get_latest_scrape_run() -> dict[str, Any]:
     Returns:
         {available: false, message: str} when no runs have been recorded
         {available: false, error: str} when MongoDB is unreachable
-        {available: true, _id, _created_at, run_metadata, per_site_counts,
-         raw_results, bot_post_status, ...} on success
+        {available: true, _id, _created_at, run_metadata, filtered_results,
+         raw_results, note, channel_id, discord_sent_status, ...} on success
     """
     try:
         doc = mongo.get_latest_run()
@@ -504,6 +539,25 @@ def get_latest_scrape_run() -> dict[str, Any]:
         return {"available": True, **doc}
     except Exception as exc:
         return {"available": False, "error": str(exc)}
+
+
+@mcp.tool()
+def update_scrape_run(run_id: str, patch: dict[str, Any]) -> dict[str, Any]:
+    """Patch an existing scrape run document (from scrape_jobs' mongo_id).
+
+    Used by the bot to add Discord columns to the SAME run document instead of
+    inserting a second one. Recommended patch keys:
+        channel_id: str (Discord channel id — NOT the bot token)
+        discord_sent_status: "success" | "failed"
+        run_metadata.bot_post_status: {total_posted, failed}  (dot-notation key)
+
+    Returns {ok: true, matched: <bool>} or {ok: false, error: <str>}.
+    """
+    try:
+        matched = mongo.update_run(run_id, patch)
+        return {"ok": True, "matched": matched}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
 
 
 @mcp.tool()
@@ -646,24 +700,26 @@ def scrape_jobs(
     # run scraper — writes per-site JSON output files
     exit_code: int = run_scraper(config, targets=target_sites, keywords=target_keywords)
 
-    # read output files: collect raw payloads for Mongo, normalize for response
+    # read output files: raw (all jobs) + filtered (post-filter) payloads for Mongo,
+    # normalize the filtered jobs for the response
     results: list[dict[str, Any]] = []
     errors: list[dict[str, str]] = []
+    filtered_results: list[dict[str, Any]] = []
     raw_results: list[dict[str, Any]] = []
     for keyword in target_keywords:
         per_site: list[dict[str, Any]] = []
         for name in target_sites:
+            raw_payload = _read_site_raw_output(config, keyword, name)
+            if raw_payload is not None:
+                raw_results.append({"keyword": keyword, "site": name, "payload": raw_payload})
+
             payload = _read_site_output(config, keyword, name)
             if payload is None:
                 errors.append(
-                    {
-                        "keyword": keyword,
-                        "site": name,
-                        "reason": "missing or invalid output JSON",
-                    }
+                    {"keyword": keyword, "site": name, "reason": "missing or invalid output JSON"}
                 )
                 continue
-            raw_results.append({"keyword": keyword, "site": name, "payload": payload})
+            filtered_results.append({"keyword": keyword, "site": name, "payload": payload})
             if isinstance(payload, dict) and "error" in payload:
                 err: dict[str, Any] = {
                     "keyword": keyword,
@@ -682,6 +738,7 @@ def scrape_jobs(
         results.append({"keyword": keyword, "sites": per_site})
 
     total_jobs = sum(s.get("count", 0) for r in results for s in r.get("sites", []))
+    note = _build_note(errors)
     result = {
         "ok": len(errors) == 0,
         "keywords": target_keywords,
@@ -700,11 +757,12 @@ def scrape_jobs(
         duration,
     )
 
-    # persist run status to disk; insert raw results to Mongo (best-effort)
     _write_status(result, duration)
 
+    # one document per run; the bot later patches it with Discord columns
+    mongo_id: str | None = None
     try:
-        inserted_id = mongo.insert_run(
+        mongo_id = mongo.insert_run(
             {
                 "run_metadata": {
                     "ok": result["ok"],
@@ -712,15 +770,19 @@ def scrape_jobs(
                     "keywords": target_keywords,
                     "requested_sites": target_sites,
                     "errors": errors,
+                    "per_site_counts": _build_per_site_counts(results),
                 },
+                "filtered_results": filtered_results,
                 "raw_results": raw_results,
+                "note": note,
             }
         )
-        log.info("scrape_jobs: mongo raw insert ok id=%s", inserted_id)
+        log.info("scrape_jobs: mongo insert ok id=%s", mongo_id)
     except Exception as exc:
-        log.error("scrape_jobs: mongo raw insert failed: %s", exc)
+        log.error("scrape_jobs: mongo insert failed: %s", exc)
 
-    return result
+    # immutable: build a new dict rather than mutating `result` (already passed to _write_status)
+    return {**result, "mongo_id": mongo_id}
 
 
 def main() -> None:
