@@ -86,3 +86,44 @@ def test_ping_propagates_failure():
         pytest.raises(RuntimeError),
     ):
         mongo_module.ping()
+
+
+def test_update_run_sets_patch_and_returns_matched():
+    from bson import ObjectId
+
+    mock_col = MagicMock()
+    mock_col.update_one.return_value.matched_count = 1
+    with patch.object(mongo_module, "get_collection", return_value=mock_col):
+        matched = mongo_module.update_run(
+            "507f1f77bcf86cd799439011",  # pragma: allowlist secret
+            {"discord_sent_status": "success"},
+        )
+    assert matched is True
+    call = mock_col.update_one.call_args
+    assert call.args[0] == {"_id": ObjectId("507f1f77bcf86cd799439011")}  # pragma: allowlist secret
+    set_doc = call.args[1]["$set"]
+    assert set_doc["discord_sent_status"] == "success"
+    assert "_updated_at" in set_doc
+
+
+def test_update_run_returns_false_when_no_match():
+    mock_col = MagicMock()
+    mock_col.update_one.return_value.matched_count = 0
+    with patch.object(mongo_module, "get_collection", return_value=mock_col):
+        matched = mongo_module.update_run(
+            "507f1f77bcf86cd799439011",  # pragma: allowlist secret
+            {"x": 1},
+        )
+    assert matched is False
+
+
+def test_update_run_does_not_mutate_input():
+    mock_col = MagicMock()
+    mock_col.update_one.return_value.matched_count = 1
+    original = {"channel_id": "123"}
+    with patch.object(mongo_module, "get_collection", return_value=mock_col):
+        mongo_module.update_run(
+            "507f1f77bcf86cd799439011",  # pragma: allowlist secret
+            original,
+        )
+    assert "_updated_at" not in original  # input patch must stay untouched
