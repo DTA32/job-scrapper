@@ -104,6 +104,7 @@ def run_one(
     label = f"{scraper.name}:{keyword_slug(keyword)}"
     output_dir.mkdir(parents=True, exist_ok=True)
     json_path = output_dir / f"{scraper.name}.json"
+    raw_path = output_dir / f"{scraper.name}.raw.json"
     debug_path = output_dir / f"{scraper.name}.debug.html"
 
     _LOG.info("[%s] fetching %s", label, scraper.url)
@@ -119,6 +120,14 @@ def run_one(
                     "keyword": keyword,
                     "attempts": [a.to_dict() for a in result.attempts],
                 },
+                indent=2,
+            )
+        )
+        # keep raw output in lockstep with json_path: reset it so a stale
+        # prior-run raw file is never mis-attributed to this failed run
+        raw_path.write_text(
+            json.dumps(
+                {"keyword": keyword, "count": 0, "jobs": [], "error": "fetch failed"},
                 indent=2,
             )
         )
@@ -140,7 +149,6 @@ def run_one(
     # any Python-level filter/limit/projection. project_jobs builds fresh dicts, so the
     # later in-place requirements enrichment cannot leak back into this raw record.
     raw_jobs = project_jobs(jobs, CANONICAL_FIELDS)
-    raw_path = output_dir / f"{scraper.name}.raw.json"
     raw_path.write_text(
         json.dumps(
             {
