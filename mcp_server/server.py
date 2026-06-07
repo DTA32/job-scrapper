@@ -503,10 +503,13 @@ def insert_scrape_run(run_data: dict[str, Any]) -> dict[str, Any]:
 
     Args:
         run_data: Arbitrary dict with run details. Recommended keys:
-            run_metadata: {ok, exit_code, keywords, requested_sites, errors}
-            per_site_counts: {<site>: {<keyword>: <count>}}
-            raw_results: full results array from scrape_jobs
-            bot_post_status: {total_posted, failed}
+            run_metadata: {ok, exit_code, keywords, requested_sites, errors,
+                           per_site_counts, bot_post_status}
+            filtered_results: per-site filtered/projected jobs
+            raw_results: per-site unfiltered jobs (only the site's query params)
+            note: failure summary string, or null
+            channel_id: Discord channel id (never the bot token)
+            discord_sent_status: "success" | "failed"
 
     Returns:
         On success: {ok: true, inserted_id: <str>}
@@ -526,8 +529,8 @@ def get_latest_scrape_run() -> dict[str, Any]:
     Returns:
         {available: false, message: str} when no runs have been recorded
         {available: false, error: str} when MongoDB is unreachable
-        {available: true, _id, _created_at, run_metadata, per_site_counts,
-         raw_results, bot_post_status, ...} on success
+        {available: true, _id, _created_at, run_metadata, filtered_results,
+         raw_results, note, channel_id, discord_sent_status, ...} on success
     """
     try:
         doc = mongo.get_latest_run()
@@ -536,6 +539,25 @@ def get_latest_scrape_run() -> dict[str, Any]:
         return {"available": True, **doc}
     except Exception as exc:
         return {"available": False, "error": str(exc)}
+
+
+@mcp.tool()
+def update_scrape_run(run_id: str, patch: dict[str, Any]) -> dict[str, Any]:
+    """Patch an existing scrape run document (from scrape_jobs' mongo_id).
+
+    Used by the bot to add Discord columns to the SAME run document instead of
+    inserting a second one. Recommended patch keys:
+        channel_id: str (Discord channel id — NOT the bot token)
+        discord_sent_status: "success" | "failed"
+        run_metadata.bot_post_status: {total_posted, failed}  (dot-notation key)
+
+    Returns {ok: true, matched: <bool>} or {ok: false, error: <str>}.
+    """
+    try:
+        matched = mongo.update_run(run_id, patch)
+        return {"ok": True, "matched": matched}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
 
 
 @mcp.tool()
