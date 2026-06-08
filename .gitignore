@@ -66,6 +66,9 @@ config.yaml.bak.*
 # Playwright
 playwright-report/
 test-results/
+
+# Temp / scratch (downloads, one-off converters, generated data dumps)
+temp/
 # Added by code-review-graph
 .code-review-graph/
 
