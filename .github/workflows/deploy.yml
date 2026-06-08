@@ -2,10 +2,12 @@ name: Build & Deploy scraper
 
 on:
   push:
-    branches: [main]
+    branches: [main] # auto-deploy on merge to main
   workflow_dispatch:
+    # or trigger manually from GitHub Actions UI
 
 jobs:
+  # 1. Build MCP server Docker image and push to ghcr.io
   build-mcp:
     runs-on: ubuntu-latest
     permissions:
@@ -48,6 +50,7 @@ jobs:
             ${{ steps.tags.outputs.latest }}
             ${{ steps.tags.outputs.sha }}
 
+  # 2. Build bot Docker image and push to ghcr.io
   build-bot:
     runs-on: ubuntu-latest
     permissions:
@@ -90,6 +93,7 @@ jobs:
             ${{ steps.tags.outputs.latest }}
             ${{ steps.tags.outputs.sha }}
 
+  # 3. SSH into VPS → pull new MCP image → restart container (runs after build-mcp)
   deploy-mcp:
     needs: build-mcp
     runs-on: ubuntu-latest
@@ -138,6 +142,7 @@ jobs:
           MONGO_DB_NAME: ${{ vars.MONGO_DB_NAME || 'job_scraper' }}
           MONGO_COLLECTION_NAME: ${{ vars.MONGO_COLLECTION_NAME || 'scrape_runs' }}
 
+  # 4. SSH into VPS → pull new bot image → restart container (runs after build-bot + deploy-mcp)
   deploy-bot:
     needs: [build-bot, deploy-mcp]
     runs-on: ubuntu-latest

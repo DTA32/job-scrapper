@@ -18,6 +18,7 @@ from .log import get_logger
 from .sites import SCRAPERS, Scraper
 from .sites._dates import parse_to_iso
 from .sites._filter import filter_reason, project_jobs
+from .sites._location import refresh_index
 from .types import CANONICAL_FIELDS, Job
 
 _LOG = get_logger()
@@ -276,6 +277,11 @@ def run(
     if proxy_url:
         _LOG.info("[runner] using proxy: %s", proxy_url)
     fetcher = default_fetch_chain(proxy=proxy_url)
+
+    # Load the wilayah location index fresh from Mongo once, single-threaded, before
+    # workers fan out. Reflects current data each run; threads then read it via
+    # get_index() during filtering. Degrades to legacy substring if Mongo is absent.
+    refresh_index()
 
     def _process(pair: tuple[str, str]) -> None:
         keyword, name = pair
