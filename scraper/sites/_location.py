@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+import os
 import re
 import unicodedata
 from collections.abc import Iterable
 from dataclasses import dataclass
+
+from ..log import get_logger
+
+_LOG = get_logger()
 
 _WS = re.compile(r"\s+")
 _SEP = re.compile(r"\s*[,/·|]\s*|\s+-\s+")
@@ -148,3 +153,66 @@ def term_to_prefixes(term: str, entries: tuple[tuple[str, str], ...]) -> set[str
         return None  # no province/city => literal term
     tops = {k for k in matched if not any(o != k and is_under(k, {o}) for o in matched)}
     return tops
+
+
+# Active index for the current scrape run, set fresh by refresh_index(). No
+# process-lifetime cache: each run reloads from Mongo so it reflects current data.
+_INDEX: WilayahIndex | None = None
+
+# province + city + district only (1-3 segments => 0..2 dots). Villages excluded.
+_KODE_REGEX = r"^\d{2}(\.\d{2}){0,2}$"
+
+
+def load_index_from_mongo() -> WilayahIndex | None:
+    """Build a FRESH index from job_scraper.wilayah. Never raises; returns None on
+    any failure (pymongo missing, server unreachable, empty collection) so the
+    caller can degrade to legacy substring instead of dropping every job."""
+    try:
+        from pymongo import MongoClient
+    except ImportError:
+        _LOG.warning("[location] pymongo unavailable; location filter degraded")
+        return None
+
+    uri = os.environ.get("MONGO_URI", "mongodb://localhost:27017")
+    db_name = os.environ.get("MONGO_DB_NAME", "job_scraper")
+    timeout = int(os.environ.get("MONGO_SERVER_SELECTION_TIMEOUT_MS", "3000"))
+    try:
+        client = MongoClient(uri, serverSelectionTimeoutMS=timeout)
+        cursor = client[db_name]["wilayah"].find(
+            {"_id": {"$regex": _KODE_REGEX}}, {"_id": 1, "nama": 1}
+        )
+        index = build_index_from_rows((doc["_id"], doc.get("nama") or "") for doc in cursor)
+    except Exception as exc:  # noqa: BLE001 - fail soft by design
+        _LOG.warning("[location] wilayah load failed (%s); location filter degraded", exc)
+        return None
+    if not index.by_name:
+        _LOG.warning("[location] wilayah collection empty; location filter degraded")
+        return None
+    _LOG.info(
+        "[location] wilayah index loaded: %d names, %d entries",
+        len(index.by_name),
+        len(index.entries),
+    )
+    return index
+
+
+def refresh_index() -> WilayahIndex | None:
+    """Reload the active index FRESH from Mongo. Call once at the start of each
+    scrape run (single-threaded) before worker threads fan out; the result is then
+    read by get_index() during filtering. No process-lifetime cache — every run
+    reflects the current wilayah collection."""
+    global _INDEX
+    _INDEX = load_index_from_mongo()
+    return _INDEX
+
+
+def get_index() -> WilayahIndex | None:
+    """Return the active index set by the most recent refresh_index(), or None if
+    none was loaded (the location filter then degrades to legacy substring)."""
+    return _INDEX
+
+
+def reset_index() -> None:
+    """Test hook: clear the active index."""
+    global _INDEX
+    _INDEX = None

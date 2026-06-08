@@ -115,3 +115,40 @@ def test_location_in_scope_true_false():
     assert pj is not None
     assert location_in_scope("Tanjung Priok", idx, pj) is True
     assert location_in_scope("Surabaya", idx, pj) is False
+
+
+from unittest.mock import patch  # noqa: E402
+
+import scraper.sites._location as loc  # noqa: E402
+
+
+def test_refresh_index_loads_and_get_returns_it():
+    fake = build_index_from_rows(_ROWS)
+    try:
+        with patch.object(loc, "load_index_from_mongo", return_value=fake):
+            assert loc.refresh_index() is fake
+        assert loc.get_index() is fake
+    finally:
+        loc.reset_index()
+
+
+def test_refresh_index_reloads_fresh_each_run():
+    a = build_index_from_rows(_ROWS)
+    b = build_index_from_rows(_ROWS)
+    try:
+        with patch.object(loc, "load_index_from_mongo", side_effect=[a, b]):
+            loc.refresh_index()
+            assert loc.get_index() is a
+            loc.refresh_index()
+            assert loc.get_index() is b  # fresh each run, not the stale first load
+    finally:
+        loc.reset_index()
+
+
+def test_refresh_index_none_on_failure_degrades():
+    try:
+        with patch.object(loc, "load_index_from_mongo", return_value=None):
+            assert loc.refresh_index() is None
+        assert loc.get_index() is None
+    finally:
+        loc.reset_index()
