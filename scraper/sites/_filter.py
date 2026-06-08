@@ -16,8 +16,6 @@ from ._location import (
 
 _LOG = get_logger()
 _WARNED_LEGACY = False
-# cache: (terms, id(index)) -> (in-scope prefixes, literal terms)
-_PARTITION_CACHE: dict[tuple[tuple[str, ...], int], tuple[frozenset[str], tuple[str, ...]]] = {}
 
 
 def project_job(job: Job, allowed: frozenset[str]) -> dict[str, Any]:
@@ -38,10 +36,9 @@ def _warn_legacy_once() -> None:
 def _partition_terms(
     expected_values: list[str], index: WilayahIndex
 ) -> tuple[frozenset[str], tuple[str, ...]]:
-    key = (tuple(expected_values), id(index))
-    cached = _PARTITION_CACHE.get(key)
-    if cached is not None:
-        return cached
+    # Recomputed per call (no cache): the active index is replaced fresh each run
+    # by refresh_index(), and scanning ~552 province/city entries is cheap. Caching
+    # on id(index) would be unsafe here — a GC'd index's id can be reused.
     prefixes: set[str] = set()
     literals: list[str] = []
     for term in expected_values:
@@ -50,9 +47,7 @@ def _partition_terms(
             prefixes |= found
         else:
             literals.append(normalize(term))
-    result = (frozenset(prefixes), tuple(literals))
-    _PARTITION_CACHE[key] = result
-    return result
+    return frozenset(prefixes), tuple(literals)
 
 
 def _location_reason(raw: str, actual_lower: str, expected_values: list[str]) -> str | None:
