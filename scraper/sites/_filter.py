@@ -2,7 +2,22 @@ from __future__ import annotations
 
 from typing import Any
 
+from ..log import get_logger
 from ..types import Job
+from ._location import (
+    WilayahIndex,
+    candidate_kodes,
+    get_index,
+    is_under,
+    normalize,
+    segments,
+    term_to_prefixes,
+)
+
+_LOG = get_logger()
+_WARNED_LEGACY = False
+# cache: (terms, id(index)) -> (in-scope prefixes, literal terms)
+_PARTITION_CACHE: dict[tuple[tuple[str, ...], int], tuple[frozenset[str], tuple[str, ...]]] = {}
 
 
 def project_job(job: Job, allowed: frozenset[str]) -> dict[str, Any]:
@@ -13,12 +28,61 @@ def project_jobs(jobs: list[Job], allowed: frozenset[str]) -> list[dict[str, Any
     return [project_job(job, allowed) for job in jobs]
 
 
-def filter_reason(job: Job, filter_: dict[str, list[str]]) -> str | None:
-    """Return None if the job passes the filter, else a short reason for the
-    first failing key (e.g. ``"location='Surabaya' not in ['jakarta', 'bekasi']"``).
+def _warn_legacy_once() -> None:
+    global _WARNED_LEGACY
+    if not _WARNED_LEGACY:
+        _WARNED_LEGACY = True
+        _LOG.warning("[filter] wilayah index unavailable; location filter using legacy substring")
 
-    Mirrors ``matches_filter`` semantics: empty candidate lists and null/missing
-    fields are skipped (the job is kept).
+
+def _partition_terms(
+    expected_values: list[str], index: WilayahIndex
+) -> tuple[frozenset[str], tuple[str, ...]]:
+    key = (tuple(expected_values), id(index))
+    cached = _PARTITION_CACHE.get(key)
+    if cached is not None:
+        return cached
+    prefixes: set[str] = set()
+    literals: list[str] = []
+    for term in expected_values:
+        found = term_to_prefixes(term, index.entries)
+        if found:
+            prefixes |= found
+        else:
+            literals.append(normalize(term))
+    result = (frozenset(prefixes), tuple(literals))
+    _PARTITION_CACHE[key] = result
+    return result
+
+
+def _location_reason(raw: str, actual_lower: str, expected_values: list[str]) -> str | None:
+    if not actual_lower:
+        return None  # blank location: keep (mirrors null handling)
+
+    index = get_index()
+    if index is None:  # genuine load failure -> legacy substring
+        _warn_legacy_once()
+        if any(e in actual_lower for e in expected_values):
+            return None
+        return f"location={raw!r} not in {expected_values}"
+
+    prefixes, literals = _partition_terms(expected_values, index)
+    kodes = candidate_kodes(raw, index)
+    if prefixes and any(is_under(k, prefixes) for k in kodes):
+        return None  # (a) under an in-scope region
+    if kodes:
+        return f"location={raw!r} resolved out of scope, not in {expected_values}"  # (b)
+    if literals and any(lit in set(segments(normalize(raw))) for lit in literals):
+        return None  # (c) nationwide/remote literal
+    return f"location={raw!r} unresolved, not in {expected_values}"
+
+
+def filter_reason(job: Job, filter_: dict[str, list[str]]) -> str | None:
+    """Return None if the job passes, else a short reason for the first failing key.
+
+    The ``location`` key uses the wilayah hierarchy resolver; all other keys keep
+    case-insensitive substring matching. Empty candidate lists and null/blank fields
+    are skipped (the job is kept).
     """
     for key, expected_values in filter_.items():
         if not expected_values:
@@ -29,8 +93,16 @@ def filter_reason(job: Job, filter_: dict[str, list[str]]) -> str | None:
         if not isinstance(actual, str):
             actual = str(actual)
         actual_lower = actual.strip().lower()
-        if not any(expected in actual_lower for expected in expected_values):
-            return f"{key}={actual!r} not in {expected_values}"
+
+        if key == "location":
+            reason = _location_reason(actual, actual_lower, expected_values)
+        elif any(expected in actual_lower for expected in expected_values):
+            reason = None
+        else:
+            reason = f"{key}={actual!r} not in {expected_values}"
+
+        if reason is not None:
+            return reason
     return None
 
 
