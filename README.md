@@ -321,8 +321,13 @@ In the bot image, `supercronic` is the entrypoint, running
 `cron/run-scraper.sh`, which runs:
 
 ```bash
-claude --dangerously-skip-permissions -p "$(cat prompts/scrape-and-post.md)"
+claude --dangerously-skip-permissions --verbose --output-format stream-json \
+  -p "$(cat prompts/scrape-and-post.md)"
 ```
+
+`--verbose --output-format stream-json` makes claude emit one JSON event per
+step (tool calls, messages, result) so the run streams live to the log; default
+text mode prints only the final result at the very end.
 
 Output is logged to `/workspace/scraper-bot/cron/scraper.log`. `cron/entrypoint.sh`
 just `exec`s supercronic.
