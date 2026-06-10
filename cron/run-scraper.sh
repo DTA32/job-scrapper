@@ -8,9 +8,13 @@ PROMPT=/workspace/scraper-bot/prompts/scrape-and-post.md
 echo "[$(date)] starting multi-site scraper run..." | tee -a "$LOG"
 cd /workspace/scraper-bot
 # --dangerously-skip-permissions: needed for unattended cron — no TTY to approve prompts
+# --verbose --output-format stream-json: emit one JSON event per step (tool calls,
+#   assistant messages, result) so the run's internals stream live to the log.
+#   Default text mode buffers and prints only the final result at the very end;
+#   --verbose alone does not stream. --verbose is required for stream-json.
 # Stream claude output to console + log, but capture *claude's* exit (not tee's).
 # POSIX sh has no ${PIPESTATUS}, so route the real rc through a file.
-{ claude --dangerously-skip-permissions -p "$(cat "$PROMPT")" 2>&1; echo "$?" >"$LOG.rc"; } | tee -a "$LOG"
+{ claude --model claude-haiku-4-5-20251001 --dangerously-skip-permissions --verbose --output-format stream-json -p "$(cat "$PROMPT")" 2>&1; echo "$?" >"$LOG.rc"; } | tee -a "$LOG"
 EXIT_CODE="$(cat "$LOG.rc")"; rm -f "$LOG.rc"
 
 if [ "$EXIT_CODE" -ne 0 ]; then
