@@ -3,7 +3,6 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ENV_FILE="${SCRIPT_DIR}/.env"
-SEEDS_DIR="${SCRIPT_DIR}/seeds"
 
 _env() { grep -E "^${1}=" "${ENV_FILE}" 2>/dev/null | head -1 | cut -d= -f2-; }
 
@@ -18,22 +17,10 @@ if [[ -z "${MONGO_PASS}" ]]; then
   exit 1
 fi
 
-URI="mongodb://${MONGO_USER}:${MONGO_PASS}@${MONGO_HOST}:${MONGO_PORT}/?authSource=admin"
+export MONGO_URI="mongodb://${MONGO_USER}:${MONGO_PASS}@${MONGO_HOST}:${MONGO_PORT}/?authSource=admin"
 
 echo "[seed] target: ${MONGO_HOST}:${MONGO_PORT} (user=${MONGO_USER})"
 
-shopt -s nullglob
-seeds=("${SEEDS_DIR}"/*.mongosh.js)
-shopt -u nullglob
-
-if [[ ${#seeds[@]} -eq 0 ]]; then
-  echo "ERROR: no *.mongosh.js files found in seeds/" >&2
-  exit 1
-fi
-
-for f in "${seeds[@]}"; do
-  echo "[seed] >>> $(basename "${f}")"
-  mongosh "${URI}" "${f}"
-done
+NODE_PATH="$(npm root -g 2>/dev/null || true)" node "${SCRIPT_DIR}/seeds/wilayah.runner.js"
 
 echo "[seed] all done"
