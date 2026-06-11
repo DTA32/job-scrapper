@@ -135,12 +135,12 @@ Run after MongoDB is up:
 MONGO_HOST=127.0.0.1 MONGO_PORT=27018 ./seed.sh   # prod via SSH tunnel
 ```
 
-Seeds (`seeds/*.mongosh.js`) are idempotent — drop + recreate each run.
+Seeds are idempotent — drop + recreate each run.
 
 **`wilayah`** — 91 599 Indonesian administrative region codes (Kepmendagri No 300.2.2-2138
 Tahun 2025). Source: [cahyadsn/wilayah](https://github.com/cahyadsn/wilayah/tree/6ff9b8a2764cd4fbeb8c15fe0cba2d5a4eb26107)
 ([wilayah.sql](https://raw.githubusercontent.com/cahyadsn/wilayah/6ff9b8a2764cd4fbeb8c15fe0cba2d5a4eb26107/db/wilayah.sql)).
-To regenerate `seeds/wilayah.mongosh.js`: `python temp/convert.py` (requires `temp/wilayah.sql`).
+Runner: `seeds/wilayah.runner.js` (Node.js, requires `mongodb` package).
 
 # SSH tunnel (reverse SOCKS proxy)
 

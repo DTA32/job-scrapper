@@ -213,6 +213,45 @@ CLAUDE_CONFIG_DIR=~/work-claude ./scripts/test-locally.sh    # different config 
 MCP_NAME=my-scraper-test ./scripts/test-locally.sh           # different test container name
 ```
 
+## Seeding reference data
+
+The `wilayah` collection stores Indonesian administrative area codes
+(91 599 rows, Kepmendagri No 300.2.2-2138 Tahun 2025). It is **not**
+seeded by the deploy pipeline — run this once on a fresh MongoDB or
+after a data refresh.
+
+### Prerequisites
+
+- SSH tunnel to the VPS MongoDB (port 27017) active locally
+- Node.js installed locally
+- `mongodb` npm package: `npm install -g mongodb` (or local)
+
+### Open tunnel
+
+**DataGrip**: connect the data source — the SSH tunnel stays open while
+DataGrip is connected. Note the local port it binds (visible in the
+SSH/SSL tab of the data source settings).
+
+**Manual**:
+```bash
+ssh -L 27017:localhost:27017 ubuntu@43.157.226.237 -N
+```
+
+### Run the seeder
+
+```bash
+MONGO_URI="mongodb://admin:<MONGO_ROOT_PASSWORD>@127.0.0.1:<LOCAL_PORT>/?authSource=admin" \
+NODE_PATH=$(npm root -g) \
+node seeds/wilayah.runner.js
+```
+
+- `MONGO_ROOT_PASSWORD` — value from your production `.env` / VPS secrets
+- `LOCAL_PORT` — `27017` for manual tunnel; check DataGrip SSH/SSL tab if using DataGrip
+
+The script drops the existing `wilayah` collection, inserts all batches,
+creates a `nama` index, and verifies the exact row count. It exits
+non-zero on mismatch.
+
 ## Bot's first run on a new schedule
 
 The bot's crontab default is `0 1 * * *` (daily at 01:00). After the
