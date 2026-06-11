@@ -55,3 +55,17 @@ def get_latest_run() -> dict[str, Any] | None:
     if doc is None:
         return None
     return {**doc, "_id": str(doc["_id"])}
+
+
+def update_run(run_id: str, patch: dict[str, Any]) -> bool:
+    """Patch an existing scrape run document by _id. Returns True if a doc matched.
+
+    Builds a new $set dict (injecting _updated_at) — never mutates ``patch``.
+    Dot-notation keys (e.g. "run_metadata.bot_post_status") are honoured by MongoDB.
+    """
+    from bson import ObjectId
+
+    collection = get_collection()
+    set_doc = {**patch, "_updated_at": datetime.now(UTC).isoformat()}
+    result = collection.update_one({"_id": ObjectId(run_id)}, {"$set": set_doc})
+    return result.matched_count > 0

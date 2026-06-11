@@ -12,8 +12,12 @@ import asyncio
 import os
 import subprocess
 
+from rich.style import Style
+from rich.text import Text
+from textual import events
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, VerticalScroll
+from textual.message import Message
 from textual.widgets import Button, Footer, Header, RichLog, Static
 
 from . import compose as compose_mod
@@ -38,6 +42,106 @@ _TEST_LABELS = {
     "cron": "Cron",
     "discord": "Discord",
 }
+
+
+def _row_under_pointer(event: events.MouseEvent) -> int | None:
+    """Buffer index of the entry under the pointer, or None.
+
+    The index rides in the cell's Rich style meta (the app writes each entry as a
+    meta-tagged Text). Reading it off the live event is wrap-proof: every strip of
+    one entry — including wrapped continuation rows — carries the same meta row, so
+    we get the entry regardless of which visual row the pointer is on, no
+    coordinate math. Returns None on a border/scrollbar/empty cell (no style) or a
+    cell with no "row" meta, which all callers treat as "not on content".
+    """
+    style = event.style
+    if style is None:
+        return None
+    return (style.meta or {}).get("row")
+
+
+class ClickCopyLog(RichLog):
+    """RichLog whose lines can be click-dragged to copy an inclusive range.
+
+    Textual has no in-app text selection for RichLog (issue #5333), so this widget
+    tracks a press-drag-release gesture at whole-line granularity and reports the
+    selected row range to the app via RangeSelected; the app owns the buffer, the
+    highlight, and the clipboard copy (this widget can't see them). A press with no
+    movement is just a 1-line range — i.e. the old single-click-copies-one-line
+    behaviour, with no separate code path.
+
+    Why a self.capture_mouse() on press: once captured, every subsequent MouseMove
+    and the MouseUp are routed here even if the pointer leaves the widget (drags
+    that wander past the log border still extend/terminate cleanly). _anchor holds
+    the press row; it is also the live "are we dragging?" flag (None == idle).
+
+    Known gap: if the terminal/OS swallows the MouseUp mid-drag (focus loss,
+    window occluded), the mouse stays captured app-wide — Textual gives no
+    mid-capture unmount/blur hook here to auto-release. Self-recovers on the next
+    press: on_mouse_down re-captures and the following up calls release_mouse().
+    """
+
+    class RangeSelected(Message):
+        # Inclusive [lo, hi] buffer-index range. final=False is a live drag update
+        # (highlight only); final=True is the release (highlight + copy).
+        def __init__(self, lo: int, hi: int, final: bool) -> None:
+            self.lo = lo
+            self.hi = hi
+            self.final = final
+            super().__init__()
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        # Row where the current drag started, or None when no drag is in flight.
+        self._anchor: int | None = None
+
+    def on_mouse_down(self, event: events.MouseDown) -> None:
+        # Begin a gesture only when the press lands on real content. A press on the
+        # border/scrollbar/empty area below the last line has no row meta, so we
+        # leave _anchor None and never capture the mouse (the gesture is a no-op).
+        row = _row_under_pointer(event)
+        if row is None:
+            return
+        self._anchor = row
+        # Route all later moves/up here even if the pointer leaves the widget.
+        self.capture_mouse()
+        # A bare press is already a valid 1-line range; report it live so the
+        # single entry highlights immediately (and so a press-release with no move
+        # still produces a (row, row) range to copy).
+        self.post_message(self.RangeSelected(row, row, final=False))
+
+    def on_mouse_move(self, event: events.MouseMove) -> None:
+        # Only meaningful mid-drag. Outside a drag (_anchor None) every hover move
+        # would otherwise spam range messages, so bail early.
+        if self._anchor is None:
+            return
+        row = _row_under_pointer(event)
+        if row is None:
+            # Pointer slid onto the border/empty area mid-drag: hold the current
+            # range rather than collapsing it, so a wandering cursor doesn't
+            # shrink the selection. (No message posted → app keeps last range.)
+            return
+        self.post_message(
+            self.RangeSelected(min(self._anchor, row), max(self._anchor, row), final=False)
+        )
+
+    def on_mouse_up(self, event: events.MouseUp) -> None:
+        # Ignore stray ups with no active gesture (e.g. press began off content).
+        if self._anchor is None:
+            return
+        self.release_mouse()
+        # If the release lands off content, end the range at the anchor rather than
+        # discarding the gesture — the user still pressed on a valid line.
+        row = _row_under_pointer(event)
+        if row is None:
+            row = self._anchor
+        # final=True triggers the copy in the app handler. Posted even when the
+        # range is unchanged since the last move, so single-click (down→up, no
+        # move) and drag-end (last move == release row) both copy.
+        self.post_message(
+            self.RangeSelected(min(self._anchor, row), max(self._anchor, row), final=True)
+        )
+        self._anchor = None
 
 
 class ManagerApp(App):
@@ -94,6 +198,10 @@ class ManagerApp(App):
         self.runner = SequenceRunner()
         self.profile_map = compose_mod.parse_profiles(self.env.compose_files)
         self._log_buffer: list[str] = []
+        # Inclusive (lo, hi) buffer-index range of the click-drag selection
+        # (persistent high-contrast highlight), or None when nothing is selected.
+        # A single click is a (n, n) range. Cleared on clear-log.
+        self._selected_range: tuple[int, int] | None = None
 
     @property
     def env(self):
@@ -117,14 +225,19 @@ class ManagerApp(App):
             Horizontal(*self._scrape_widgets(), id="scrape"),
             id="bottom",
         )
-        yield RichLog(id="log", highlight=False, markup=False, wrap=True)
+        # wrap=True so long stream-json lines fold to panel width instead of
+        # scrolling horizontally off-screen. Click-to-copy still works because
+        # each entry is written as a meta-tagged Text: every wrapped strip of an
+        # entry carries the same buffer index, so a click resolves it via meta.
+        yield ClickCopyLog(id="log", highlight=False, markup=False, wrap=True)
         yield Footer()
 
     def on_mount(self) -> None:
         self._render_summary()
         self._update_env_buttons()
-        self.query_one("#log", RichLog).write(
-            "Docker manager ready. Tab to an action to preview it; Enter runs it."
+        self._write_log(
+            "Docker manager ready. Tab to an action to preview it; Enter runs it. "
+            "Click a log line to copy it."
         )
 
     # ---- row construction --------------------------------------------------
@@ -219,11 +332,9 @@ class ManagerApp(App):
     async def _execute(self, sequence, action: str) -> None:
         if action == "start" and self.env.proxy is not None:
             await self._warn_if_proxy_down()
-        log = self.query_one("#log", RichLog)
 
         def _write(line: str) -> None:
-            self._log_buffer.append(str(line))
-            log.write(line)
+            self._write_log(str(line))
 
         await self.runner.run(sequence, _write)
 
@@ -254,6 +365,7 @@ class ManagerApp(App):
 
     def action_clear_log(self) -> None:
         self._log_buffer.clear()
+        self._selected_range = None
         self.query_one("#log", RichLog).clear()
 
     def action_toggle_log(self) -> None:
@@ -265,7 +377,43 @@ class ManagerApp(App):
         if not self._log_buffer:
             self._log("(log is empty)")
             return
-        content = "\n".join(self._log_buffer)
+        if self._copy_text("\n".join(self._log_buffer)):
+            self._log(f"✓ copied {len(self._log_buffer)} lines to clipboard")
+
+    def on_click_copy_log_range_selected(self, event: ClickCopyLog.RangeSelected) -> None:
+        # Live drag updates (final=False) fire on every MouseMove, but the range
+        # only changes when the pointer crosses an entry boundary. Repaint ONLY on
+        # an actual change: _repaint_log is O(N) over the buffer, so repainting per
+        # raw move would make a long drag quadratic. Clamp to the buffer first so a
+        # stale row index (e.g. log cleared mid-drag) can never slice out of range.
+        n = len(self._log_buffer)
+        if n == 0:
+            return
+        lo = max(0, min(event.lo, n - 1))
+        hi = max(0, min(event.hi, n - 1))
+        new_range = (lo, hi)
+        if new_range != self._selected_range:
+            self._selected_range = new_range
+            self._repaint_log()
+        # Copy on release. This is a SIBLING of the dedupe check above, never
+        # nested under it: on release the last MouseMove already set this range, so
+        # the range is unchanged here — nesting the copy would silently skip it
+        # (and would break single-click, whose down sets (n,n) and up re-sends it).
+        if event.final:
+            text = "\n".join(self._log_buffer[lo : hi + 1])
+            if self._copy_text(text):
+                # Transient toast, not a log write: a log write would append a line
+                # and (at the bottom) scroll, fighting the selection just made.
+                # (Copy *failures* still log via _copy_text — rare and worth a
+                # persistent line the user won't miss.)
+                count = hi - lo + 1
+                if count == 1:
+                    self.notify(f"copied line {lo + 1}", timeout=2)
+                else:
+                    self.notify(f"copied {count} lines ({lo + 1}–{hi + 1})", timeout=2)
+
+    def _copy_text(self, content: str) -> bool:
+        """Copy text via the platform clipboard tool; return success, log on failure."""
         try:
             if os.environ.get("WAYLAND_DISPLAY"):
                 subprocess.run(["wl-copy"], input=content.encode(), check=True, timeout=3)
@@ -273,11 +421,12 @@ class ManagerApp(App):
                 subprocess.run(
                     ["xclip", "-sel", "clip"], input=content.encode(), check=True, timeout=3
                 )
-            self._log(f"✓ copied {len(self._log_buffer)} lines to clipboard")
+            return True
         except FileNotFoundError as exc:
             self._log(f"! clipboard tool not found: {exc.filename} — install wl-clipboard or xclip")
         except Exception as exc:
             self._log(f"! copy failed: {exc}")
+        return False
 
     # ---- environment switch ------------------------------------------------
     async def _switch_env(self, name: str) -> None:
@@ -338,9 +487,51 @@ class ManagerApp(App):
                 lines.append(f"[b]{key}:[/b] {env_vars[key]}")
         self.query_one("#summary", Static).update("\n".join(lines))
 
+    def _styled_line(self, idx: int) -> Text:
+        # One buffer entry rendered as a meta-tagged Text. The meta {"row": idx}
+        # rides on every cell (and every wrapped strip), so any press/drag over the
+        # entry resolves back to this index. Entries inside the selected range ALSO
+        # get a high-contrast highlight — combined with `+` so they keep their meta
+        # (a bare highlight style would drop "row" and make the line un-copyable).
+        style = Style.from_meta({"row": idx})
+        selected = self._selected_range
+        if selected is not None and selected[0] <= idx <= selected[1]:
+            style = style + Style(color="black", bgcolor="yellow", bold=True)
+        return Text(self._log_buffer[idx], style=style)
+
+    def _write_log(self, line: str) -> None:
+        # Append-only fast path for streaming output: tag with this entry's
+        # permanent buffer index, append, then write one meta-tagged Text. An
+        # embedded "\n" no longer breaks click-to-copy — wrap shares one meta row
+        # across all strips of the entry, so every strip maps to the same index.
+        log = self.query_one("#log", RichLog)
+        # Tail-follow: keep scrolling to the bottom only if we're already there.
+        # If the user scrolled up (e.g. to click-copy a line), leave them put.
+        log.auto_scroll = log.scroll_offset.y >= log.max_scroll_y
+        idx = len(self._log_buffer)
+        self._log_buffer.append(line)
+        log.write(self._styled_line(idx))
+
+    def _repaint_log(self) -> None:
+        # Full re-render, called only on selection change (never per write) so
+        # streaming stays append-only. Re-writes every buffer entry, highlighting
+        # the selected one. auto_scroll is forced off during the rewrite so the
+        # tail-follow doesn't clobber the restored scroll position.
+        #
+        # Safe because every writer (this method + _write_log) runs on the event
+        # loop with no threads (runner streams via `async for` on the loop), so
+        # nothing can append between clear() and the rewrite loop below. A future
+        # threaded log callback would break that and must re-establish it.
+        log = self.query_one("#log", RichLog)
+        saved_y = log.scroll_offset.y
+        log.clear()
+        log.auto_scroll = False
+        for idx in range(len(self._log_buffer)):
+            log.write(self._styled_line(idx))
+        log.scroll_to(y=saved_y, animate=False)
+
     def _log(self, message: str) -> None:
-        self._log_buffer.append(message)
-        self.query_one("#log", RichLog).write(message)
+        self._write_log(message)
 
 
 def _split_host_port(url: str) -> tuple[str, int]:

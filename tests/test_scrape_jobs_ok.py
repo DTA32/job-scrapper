@@ -13,12 +13,15 @@ def _make_config(keyword: str = "data analyst", site: str = "jobstreet"):
     return cfg
 
 
+@patch("mcp_server.server.mongo")
 @patch("mcp_server.server.run_scraper", return_value=0)
 @patch("mcp_server.server._load_config")
+@patch("mcp_server.server._read_site_raw_output")
 @patch("mcp_server.server._read_site_output")
-def test_ok_true_when_zero_jobs(mock_read, mock_load, mock_run):
+def test_ok_true_when_zero_jobs(mock_read, mock_read_raw, mock_load, mock_run, mock_mongo):
     """0 jobs returned but fetch succeeded → ok must be True."""
     mock_load.return_value = _make_config()
+    mock_read_raw.return_value = None
     mock_read.return_value = {
         "keyword": "data analyst",
         "fields": ["title"],
@@ -37,12 +40,15 @@ def test_ok_true_when_zero_jobs(mock_read, mock_load, mock_run):
     assert result["results"][0]["sites"][0]["count"] == 0
 
 
+@patch("mcp_server.server.mongo")
 @patch("mcp_server.server.run_scraper", return_value=0)
 @patch("mcp_server.server._load_config")
+@patch("mcp_server.server._read_site_raw_output")
 @patch("mcp_server.server._read_site_output")
-def test_ok_true_when_jobs_found(mock_read, mock_load, mock_run):
+def test_ok_true_when_jobs_found(mock_read, mock_read_raw, mock_load, mock_run, mock_mongo):
     """Jobs found → ok must be True."""
     mock_load.return_value = _make_config()
+    mock_read_raw.return_value = None
     mock_read.return_value = {
         "keyword": "data analyst",
         "fields": ["title"],
@@ -61,12 +67,15 @@ def test_ok_true_when_jobs_found(mock_read, mock_load, mock_run):
     assert result["results"][0]["sites"][0]["count"] == 2
 
 
+@patch("mcp_server.server.mongo")
 @patch("mcp_server.server.run_scraper", return_value=0)
 @patch("mcp_server.server._load_config")
+@patch("mcp_server.server._read_site_raw_output")
 @patch("mcp_server.server._read_site_output")
-def test_ok_false_when_fetch_failed(mock_read, mock_load, mock_run):
+def test_ok_false_when_fetch_failed(mock_read, mock_read_raw, mock_load, mock_run, mock_mongo):
     """Fetch failed → ok must be False, error captured, sites list empty."""
     mock_load.return_value = _make_config()
+    mock_read_raw.return_value = None
     mock_read.return_value = {
         "error": "fetch failed",
         "url": "https://example.com",
@@ -83,12 +92,15 @@ def test_ok_false_when_fetch_failed(mock_read, mock_load, mock_run):
     assert result["results"][0]["sites"] == []
 
 
+@patch("mcp_server.server.mongo")
 @patch("mcp_server.server.run_scraper", return_value=0)
 @patch("mcp_server.server._load_config")
+@patch("mcp_server.server._read_site_raw_output")
 @patch("mcp_server.server._read_site_output")
-def test_ok_false_when_output_missing(mock_read, mock_load, mock_run):
+def test_ok_false_when_output_missing(mock_read, mock_read_raw, mock_load, mock_run, mock_mongo):
     """Missing output file (None from _read_site_output) → ok False."""
     mock_load.return_value = _make_config()
+    mock_read_raw.return_value = None
     mock_read.return_value = None
 
     from mcp_server.server import scrape_jobs
@@ -100,13 +112,18 @@ def test_ok_false_when_output_missing(mock_read, mock_load, mock_run):
     assert result["results"][0]["sites"] == []
 
 
+@patch("mcp_server.server.mongo")
 @patch("mcp_server.server._write_status")
 @patch("mcp_server.server.run_scraper", return_value=0)
 @patch("mcp_server.server._load_config")
+@patch("mcp_server.server._read_site_raw_output")
 @patch("mcp_server.server._read_site_output")
-def test_scrape_jobs_writes_status(mock_read, mock_load, mock_run, mock_write_status):
+def test_scrape_jobs_writes_status(
+    mock_read, mock_read_raw, mock_load, mock_run, mock_write_status, mock_mongo
+):
     """scrape_jobs must call _write_status exactly once after a run."""
     mock_load.return_value = _make_config()
+    mock_read_raw.return_value = None
     mock_read.return_value = {
         "keyword": "data analyst",
         "fields": ["title"],
@@ -126,11 +143,16 @@ def test_scrape_jobs_writes_status(mock_read, mock_load, mock_run, mock_write_st
     assert isinstance(duration_arg, float)
 
 
+@patch("mcp_server.server.mongo")
 @patch("mcp_server.server.run_scraper", return_value=0)
 @patch("mcp_server.server._load_config")
+@patch("mcp_server.server._read_site_raw_output")
 @patch("mcp_server.server._read_site_output")
-def test_scrape_jobs_normalizes_jobs_to_canonical_schema(mock_read, mock_load, mock_run):
+def test_scrape_jobs_normalizes_jobs_to_canonical_schema(
+    mock_read, mock_read_raw, mock_load, mock_run, mock_mongo
+):
     mock_load.return_value = _make_config()
+    mock_read_raw.return_value = None
     mock_read.return_value = {
         "keyword": "data analyst",
         "fields": ["title", "company", "url"],
@@ -160,6 +182,66 @@ def test_scrape_jobs_normalizes_jobs_to_canonical_schema(mock_read, mock_load, m
     assert site_entry["count"] == 1
 
 
+@patch("mcp_server.server.mongo")
+@patch("mcp_server.server.run_scraper", return_value=0)
+@patch("mcp_server.server._load_config")
+@patch("mcp_server.server._read_site_raw_output")
+@patch("mcp_server.server._read_site_output")
+def test_scrape_jobs_returns_mongo_id_and_builds_document(
+    mock_read, mock_read_raw, mock_load, mock_run, mock_mongo
+):
+    """One document per run: raw_results (all jobs) + filtered_results (cut-down) + per_site_counts."""
+    mock_load.return_value = _make_config()
+    mock_read.return_value = {
+        "keyword": "data analyst",
+        "fields": ["title"],
+        "count": 2,
+        "jobs": [{"title": "A"}, {"title": "B"}],
+        "max_age_hours": 24,
+        "filter": None,
+    }
+    mock_read_raw.return_value = {
+        "keyword": "data analyst",
+        "fields": list(JOB_FIELD_ORDER),
+        "count": 5,
+        "jobs": [{"title": t} for t in "ABCDE"],
+    }
+    mock_mongo.insert_run.return_value = "deadbeef"
+
+    from mcp_server.server import scrape_jobs
+
+    result = scrape_jobs(keywords=["data analyst"], sites=["jobstreet"])
+
+    assert result["mongo_id"] == "deadbeef"
+    doc = mock_mongo.insert_run.call_args.args[0]
+    assert doc["raw_results"][0]["payload"]["count"] == 5  # all jobs
+    assert doc["filtered_results"][0]["payload"]["count"] == 2  # cut-down list
+    assert doc["run_metadata"]["per_site_counts"] == {"jobstreet": {"data analyst": 2}}
+    assert "raw_results" not in doc["run_metadata"]  # not nested
+    assert doc["note"] is None  # no errors → no note
+
+
+@patch("mcp_server.server.mongo")
+@patch("mcp_server.server.run_scraper", return_value=0)
+@patch("mcp_server.server._load_config")
+@patch("mcp_server.server._read_site_raw_output", return_value=None)
+@patch("mcp_server.server._read_site_output")
+def test_scrape_jobs_sets_note_on_error(mock_read, mock_read_raw, mock_load, mock_run, mock_mongo):
+    mock_load.return_value = _make_config()
+    mock_read.return_value = {
+        "error": "fetch failed",
+        "url": "https://x",
+        "keyword": "data analyst",
+    }
+    mock_mongo.insert_run.return_value = "id1"
+
+    from mcp_server.server import scrape_jobs
+
+    scrape_jobs(keywords=["data analyst"], sites=["jobstreet"])
+    doc = mock_mongo.insert_run.call_args.args[0]
+    assert doc["note"] is not None and "jobstreet" in doc["note"]
+
+
 def test_get_scrape_response_structure_exposes_canonical_fields():
     from mcp_server.server import get_scrape_response_structure
 
@@ -174,4 +256,5 @@ def test_get_scrape_response_structure_exposes_canonical_fields():
         "exit_code",
         "results",
         "errors",
+        "mongo_id",
     ]

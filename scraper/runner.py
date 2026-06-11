@@ -18,7 +18,8 @@ from .log import get_logger
 from .sites import SCRAPERS, Scraper
 from .sites._dates import parse_to_iso
 from .sites._filter import filter_reason, project_jobs
-from .types import Job
+from .sites._location import refresh_index
+from .types import CANONICAL_FIELDS, Job
 
 _LOG = get_logger()
 
@@ -104,6 +105,7 @@ def run_one(
     label = f"{scraper.name}:{keyword_slug(keyword)}"
     output_dir.mkdir(parents=True, exist_ok=True)
     json_path = output_dir / f"{scraper.name}.json"
+    raw_path = output_dir / f"{scraper.name}.raw.json"
     debug_path = output_dir / f"{scraper.name}.debug.html"
 
     _LOG.info("[%s] fetching %s", label, scraper.url)
@@ -122,6 +124,14 @@ def run_one(
                 indent=2,
             )
         )
+        # keep raw output in lockstep with json_path: reset it so a stale
+        # prior-run raw file is never mis-attributed to this failed run
+        raw_path.write_text(
+            json.dumps(
+                {"keyword": keyword, "count": 0, "jobs": [], "error": "fetch failed"},
+                indent=2,
+            )
+        )
         return
 
     if html:
@@ -135,6 +145,23 @@ def run_one(
     _LOG.info("[%s] parsed %d job(s)", label, parsed_count)
 
     _enrich_jobs(jobs, keyword)
+
+    # snapshot ALL parsed jobs (only the site's query-param filtering applied) BEFORE
+    # any Python-level filter/limit/projection. project_jobs builds fresh dicts, so the
+    # later in-place requirements enrichment cannot leak back into this raw record.
+    raw_jobs = project_jobs(jobs, CANONICAL_FIELDS)
+    raw_path.write_text(
+        json.dumps(
+            {
+                "keyword": keyword,
+                "fields": sorted(CANONICAL_FIELDS),
+                "count": len(raw_jobs),
+                "jobs": raw_jobs,
+            },
+            indent=2,
+        )
+    )
+    _LOG.info("[%s] wrote %s (%d raw job(s))", label, raw_path.name, len(raw_jobs))
 
     cutoff: datetime | None = None
     if max_age_hours is not None:
@@ -250,6 +277,11 @@ def run(
     if proxy_url:
         _LOG.info("[runner] using proxy: %s", proxy_url)
     fetcher = default_fetch_chain(proxy=proxy_url)
+
+    # Load the wilayah location index fresh from Mongo once, single-threaded, before
+    # workers fan out. Reflects current data each run; threads then read it via
+    # get_index() during filtering. Degrades to legacy substring if Mongo is absent.
+    refresh_index()
 
     def _process(pair: tuple[str, str]) -> None:
         keyword, name = pair

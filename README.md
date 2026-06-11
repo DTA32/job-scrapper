@@ -29,6 +29,7 @@ pip install -r scripts/requirements.txt   # textual + pyyaml — NOT the root re
 The root `requirements.txt` is baked into the Docker images and is not needed on the host.
 
 The TUI is a single Textual screen with:
+
 - **Env bar** — `dev` / `prod` buttons (default `dev`, from `scripts/environments.yaml`)
 - **Summary panel** — shows merged keywords, enabled sites, proxy status, mongo db/collection, masked `.env` secrets
 - **Command preview panel** — shows the exact command that will run when you press a button
@@ -48,7 +49,7 @@ Before first run, copy the `.example` files (see section below).
 
 This is for a **`claude` CLI you run on your host machine** (your laptop terminal,
 in the repo dir) to talk to the dockerized MCP server — handy for ad-hoc testing
-without going through the bot. This is a *different* client from the dockerized
+without going through the bot. This is a _different_ client from the dockerized
 bot, which ships its own baked `claude-code` and uses `host.docker.internal`
 (see [MCP on Docker](#mcp-on-docker)).
 
@@ -91,29 +92,55 @@ URL and is baked into the bot image as `/workspace/scraper-bot/.mcp.json`
 (Dockerfile `bot` stage).
 
 Compose wiring that makes this work:
+
 - `bot` service has `extra_hosts: ["host.docker.internal:host-gateway"]` (Linux)
 - In prod, `scraper-mcp` uses `network_mode: host`, so it listens on the host's
   `:8080` that `host.docker.internal` resolves to
 
 # Ports used here
 
-| Service | Port | Bind | Notes |
-|---|---|---|---|
-| `scraper-mcp` | 8080 | `0.0.0.0:8080` (dev); host network (prod) | MCP HTTP; `/health` and `/mcp` endpoints |
-| `mongo` | 27017 | `127.0.0.1:27017` | profiles `mcp`, `mongo`; data in `mongo-data` volume |
-| `bot` | — | none | outbound only (Discord API, `host.docker.internal:8080`) |
+| Service       | Port  | Bind                                      | Notes                                                    |
+| ------------- | ----- | ----------------------------------------- | -------------------------------------------------------- |
+| `scraper-mcp` | 8080  | `0.0.0.0:8080` (dev); host network (prod) | MCP HTTP; `/health` and `/mcp` endpoints                 |
+| `mongo`       | 27017 | `127.0.0.1:27017`                         | profiles `mcp`, `mongo`; data in `mongo-data` volume     |
+| `bot`         | —     | none                                      | outbound only (Discord API, `host.docker.internal:8080`) |
 
 # Copy the .example files
 
-| Example | Copy to | Purpose |
-|---|---|---|
-| `.env.example` | `.env` | local compose env vars: Discord tokens, Mongo creds, `PROXY_URL` |
-| `config.dev.patch.yaml.example` | `config.dev.patch.yaml` | dev config overrides (merged over `config.yaml`) |
+| Example                         | Copy to                 | Purpose                                                          |
+| ------------------------------- | ----------------------- | ---------------------------------------------------------------- |
+| `.env.example`                  | `.env`                  | local compose env vars: Discord tokens, Mongo creds, `PROXY_URL` |
+| `config.dev.patch.yaml.example` | `config.dev.patch.yaml` | dev config overrides (merged over `config.yaml`)                 |
 | `scripts/ssh-tunnel.sh.example` | `scripts/ssh-tunnel.sh` | reverse SOCKS proxy helper — gitignored, contains real host/user |
-| `claude/mcp.json.example` | `.mcp.json` | MCP client config for Claude (update URL for host vs Docker) |
+| `claude/mcp.json.example`       | `.mcp.json`             | MCP client config for Claude (update URL for host vs Docker)     |
 
 `.env` is for local Docker Compose only. Production injects all env vars through
 GitHub Actions secrets/variables — it never reads this file.
+
+**MongoDB connection URL:** the app reads `MONGO_URI` (`mcp_server/mongo.py`). You
+don't set it directly — Docker Compose derives it from `MONGO_ROOT_USER` +
+`MONGO_ROOT_PASSWORD`:
+
+- dev / bridge network (`docker-compose.yml`): `mongodb://<user>:<password>@mongo:27017`
+- prod / host network (`docker-compose.prod.yml`): `mongodb://<user>:<password>@localhost:27017`
+
+Outside Docker the code default is `mongodb://localhost:27017`.
+
+# Seed reference data
+
+Run after MongoDB is up:
+
+```bash
+./seed.sh                                          # local (reads .env)
+MONGO_HOST=127.0.0.1 MONGO_PORT=27018 ./seed.sh   # prod via SSH tunnel
+```
+
+Seeds (`seeds/*.mongosh.js`) are idempotent — drop + recreate each run.
+
+**`wilayah`** — 91 599 Indonesian administrative region codes (Kepmendagri No 300.2.2-2138
+Tahun 2025). Source: [cahyadsn/wilayah](https://github.com/cahyadsn/wilayah/tree/6ff9b8a2764cd4fbeb8c15fe0cba2d5a4eb26107)
+([wilayah.sql](https://raw.githubusercontent.com/cahyadsn/wilayah/6ff9b8a2764cd4fbeb8c15fe0cba2d5a4eb26107/db/wilayah.sql)).
+To regenerate `seeds/wilayah.mongosh.js`: `python temp/convert.py` (requires `temp/wilayah.sql`).
 
 # SSH tunnel (reverse SOCKS proxy)
 
@@ -136,14 +163,73 @@ cp scripts/ssh-tunnel.sh.example scripts/ssh-tunnel.sh
 Commands:
 
 ```bash
-./scripts/ssh-tunnel.sh up      # open the reverse SOCKS proxy
-./scripts/ssh-tunnel.sh down    # close it
-./scripts/ssh-tunnel.sh status  # proxy liveness + docker ps on remote
-./scripts/ssh-tunnel.sh test    # verify remote traffic exits via this machine's IP
+./scripts/ssh-tunnel.sh up           # open the reverse SOCKS proxy
+./scripts/ssh-tunnel.sh down         # close it
+./scripts/ssh-tunnel.sh status       # proxy + mongo tunnel liveness + docker ps
+./scripts/ssh-tunnel.sh test         # verify remote traffic exits via this machine's IP
+./scripts/ssh-tunnel.sh mongo-up     # forward local :27018 → remote MongoDB
+./scripts/ssh-tunnel.sh mongo-down   # close the mongo forward tunnel
+./scripts/ssh-tunnel.sh mongo-status # show mongo tunnel liveness
+./scripts/ssh-tunnel.sh mongo-test   # verify port reachable + mongosh ping
+./scripts/ssh-tunnel.sh mongo-reset  # reset remote mongo root password (see below)
 ```
 
 The `test` command confirms the proxied egress IP differs from the server's
 direct egress IP. If they match, the tunnel is not working.
+
+## Connecting to prod MongoDB from local machine
+
+Prod MongoDB binds to `127.0.0.1:27017` on the server — not exposed publicly.
+Use `mongo-up` to open a forward tunnel, then connect normally:
+
+```bash
+./scripts/ssh-tunnel.sh mongo-up
+mongosh "mongodb://admin:<MONGO_ROOT_PASSWORD>@127.0.0.1:27018"
+```
+
+Any client connecting from outside the server (DataGrip, DBeaver, Compass, Python scripts)
+must go through the tunnel the same way — run `mongo-up` first, then connect using
+`mongodb://<user>:<password>@127.0.0.1:27018`. Verify with `mongo-test`:
+
+```bash
+./scripts/ssh-tunnel.sh mongo-up
+./scripts/ssh-tunnel.sh mongo-test
+```
+
+Default local port is `27018` (not `27017`) to avoid conflict with a running dev
+mongo container. Override if needed:
+
+```bash
+MONGO_PORT=27019 ./scripts/ssh-tunnel.sh mongo-up
+```
+
+### "Authentication failed" against prod mongo
+
+If `mongo-test` reports auth failure (and `job-scraper-mcp` shows `unhealthy`)
+even though `MONGO_ROOT_PASSWORD` looks correct, the volume was **first**
+initialized with different creds. `MONGO_INITDB_ROOT_USERNAME` / `_PASSWORD`
+only apply on the **first** mongod start against an **empty** `mongo-data`
+volume — once data exists, mongod stores creds in the volume and ignores those
+env vars forever. So changing the GitHub secret and redeploying has **no
+effect** on the password.
+
+Fix in place (keeps data) — reset the stored password to `MONGO_ROOT_PASSWORD`:
+
+```bash
+./scripts/ssh-tunnel.sh mongo-reset
+```
+
+This SSHes in, stops the authed mongo, boots a throwaway no-auth mongo on the
+same volume, sets the `admin` password, then restarts the real container (a
+`trap` restarts it even if a step fails). Re-run `mongo-test` to confirm.
+
+Alternative (clean slate, **loses scrape history**): remove the container +
+volume so the next start re-initializes from current env:
+
+```bash
+docker rm -f job-scraper-mongo && docker volume rm job-scrapper_mongo-data
+# then redeploy, or `docker compose ... --profile mcp up -d`
+```
 
 # Deployment process
 
@@ -151,11 +237,13 @@ direct egress IP. If they match, the tunnel is not working.
 `workflow_dispatch`.
 
 **Build jobs** (`build-mcp` + `build-bot`, run in parallel):
+
 - Build and push each Docker image to `ghcr.io`
 - Two tags per image: rolling (`mcp-latest` / `bot-latest`) and immutable per-commit (`mcp-<sha>` / `bot-<sha>`)
 - Uses GitHub Actions layer cache to speed up rebuilds
 
 **Deploy jobs** (sequential after their respective build):
+
 1. `deploy-mcp` (needs `build-mcp`): copies `docker-compose.yml` + `docker-compose.prod.yml` to the server via SCP, then SSHs in and runs `docker compose --profile mcp pull && up -d --no-build`, pinned to the immutable sha tag
 2. `deploy-bot` (needs `build-bot` + `deploy-mcp`): same flow for `--profile bot`, injects Discord tokens, Claude config paths, and `TZ`
 
@@ -164,17 +252,17 @@ direct egress IP. If they match, the tunnel is not working.
 `config.yaml` is the single source of truth, committed to the repo and baked
 into Docker images at build time. Key fields:
 
-| Field | Purpose |
-|---|---|
-| `keywords` | Job titles to search |
-| `limit` / `concurrency` | Global result cap and parallel fetches |
-| `proxy` | SOCKS5/HTTP proxy URL; absent or `~` = direct connection |
-| `max_age_hours` | Drop jobs older than this |
-| `filter.location` | Keep only jobs matching these locations |
-| `bot.schedule` | Cron expression for the Discord bot (e.g. `"0 11 * * *"`) |
-| `bot.message_template` | Discord message format with `{field}` placeholders |
-| `bot.max_chars` | Truncate messages to this length |
-| `sites.*` | Per-site `enabled`, `limit`, `url_template`, `fields` |
+| Field                   | Purpose                                                   |
+| ----------------------- | --------------------------------------------------------- |
+| `keywords`              | Job titles to search                                      |
+| `limit` / `concurrency` | Global result cap and parallel fetches                    |
+| `proxy`                 | SOCKS5/HTTP proxy URL; absent or `~` = direct connection  |
+| `max_age_hours`         | Drop jobs older than this                                 |
+| `filter.location`       | Keep only jobs matching these locations                   |
+| `bot.schedule`          | Cron expression for the Discord bot (e.g. `"0 11 * * *"`) |
+| `bot.message_template`  | Discord message format with `{field}` placeholders        |
+| `bot.max_chars`         | Truncate messages to this length                          |
+| `sites.*`               | Per-site `enabled`, `limit`, `url_template`, `fields`     |
 
 **Do you need a dev version?** Yes (recommended). Create `config.dev.patch.yaml`
 (copy from `config.dev.patch.yaml.example`) to override only what you need for
@@ -233,8 +321,13 @@ In the bot image, `supercronic` is the entrypoint, running
 `cron/run-scraper.sh`, which runs:
 
 ```bash
-claude --dangerously-skip-permissions -p "$(cat prompts/scrape-and-post.md)"
+claude --dangerously-skip-permissions --verbose --output-format stream-json \
+  -p "$(cat prompts/scrape-and-post.md)"
 ```
+
+`--verbose --output-format stream-json` makes claude emit one JSON event per
+step (tool calls, messages, result) so the run streams live to the log; default
+text mode prints only the final result at the very end.
 
 Output is logged to `/workspace/scraper-bot/cron/scraper.log`. `cron/entrypoint.sh`
 just `exec`s supercronic.
@@ -251,6 +344,58 @@ so it idles and does not run cron. To fire a run manually:
 # Or directly:
 docker exec job-scraper-bot /bin/sh /workspace/scraper-bot/cron/run-scraper.sh
 ```
+
+# Query MongoDB data
+
+Connect to the Mongo shell:
+
+```bash
+docker exec -it job-scraper-mongo mongosh -u admin -p <MONGO_ROOT_PASSWORD> --authenticationDatabase admin
+```
+
+Then query the scrape history:
+
+```js
+use job_scraper
+
+// all runs
+db.scrape_runs.find({})
+
+// latest first
+db.scrape_runs.find({}).sort({ _id: -1 })
+
+// count
+db.scrape_runs.countDocuments()
+
+// latest single run
+db.scrape_runs.findOne({}, {}, { sort: { _id: -1 } })
+```
+
+# Clear / reset MongoDB data
+
+⚠️ **Irreversible.** In MongoDB, columns (fields) live on the documents, not in a
+fixed schema — deleting the documents removes the old fields with them. After a
+wipe, only the columns the current code writes reappear on the next run.
+
+Connect to the Mongo shell (same `docker exec … mongosh` as
+[Query MongoDB data](#query-mongodb-data)), then:
+
+```js
+use job_scraper
+
+// empty the collection — keeps it and its indexes (recommended)
+db.scrape_runs.deleteMany({})
+
+// or drop the collection (removes documents + indexes)
+db.scrape_runs.drop()
+
+// or drop the whole database
+db.dropDatabase()
+```
+
+For **prod**, open the SSH tunnel first (see
+[Connecting to prod MongoDB from local machine](#connecting-to-prod-mongodb-from-local-machine)),
+then run the same commands.
 
 # Check logs
 
@@ -302,12 +447,12 @@ Then run `/mcp` to list available servers and tools. The MCP server exposes:
 
 **Quick smoke tests** (TUI tests row, no full cron run needed):
 
-| Button | What it tests |
-|---|---|
-| **Scrape** | Runs `python -m scraper` in `scraper-mcp` — scrape only, no Mongo write, no Discord post |
-| **Mongo** | Inserts + reads + drops a throwaway document in `scraper-mcp` via the real Mongo connection |
-| **Discord** | Posts one test message to your Discord channel from the bot container |
-| **Cron** | Fires the full cron job once (`run-scraper.sh`) — real scrape + real Discord posts |
+| Button      | What it tests                                                                               |
+| ----------- | ------------------------------------------------------------------------------------------- |
+| **Scrape**  | Runs `python -m scraper` in `scraper-mcp` — scrape only, no Mongo write, no Discord post    |
+| **Mongo**   | Inserts + reads + drops a throwaway document in `scraper-mcp` via the real Mongo connection |
+| **Discord** | Posts one test message to your Discord channel from the bot container                       |
+| **Cron**    | Fires the full cron job once (`run-scraper.sh`) — real scrape + real Discord posts          |
 
 # The scraping prompt (prompts/scrape-and-post.md)
 
@@ -336,23 +481,23 @@ Set these in your repository's **Settings → Secrets and variables**.
 
 **Secrets** (encrypted, never logged):
 
-| Secret | Required by | Purpose |
-|---|---|---|
-| `SSH_HOST` | deploy jobs | Server IP or hostname |
-| `SSH_USER` | deploy jobs | SSH login user |
-| `SSH_PRIVATE_KEY` | deploy jobs | Private key for SSH authentication |
-| `MONGO_ROOT_PASSWORD` | deploy-mcp | MongoDB root password |
-| `DISCORD_BOT_TOKEN` | deploy-bot | Discord bot application token |
-| `DISCORD_CHANNEL_ID` | deploy-bot | Target channel ID for job posts |
-| `GITHUB_TOKEN` | build jobs | Auto-provided; used to push to ghcr.io |
+| Secret                | Required by | Purpose                                |
+| --------------------- | ----------- | -------------------------------------- |
+| `SSH_HOST`            | deploy jobs | Server IP or hostname                  |
+| `SSH_USER`            | deploy jobs | SSH login user                         |
+| `SSH_PRIVATE_KEY`     | deploy jobs | Private key for SSH authentication     |
+| `MONGO_ROOT_PASSWORD` | deploy-mcp  | MongoDB root password                  |
+| `DISCORD_BOT_TOKEN`   | deploy-bot  | Discord bot application token          |
+| `DISCORD_CHANNEL_ID`  | deploy-bot  | Target channel ID for job posts        |
+| `GITHUB_TOKEN`        | build jobs  | Auto-provided; used to push to ghcr.io |
 
 **Variables** (plain text, shown in logs):
 
-| Variable | Default | Purpose |
-|---|---|---|
-| `MONGO_ROOT_USER` | `admin` | MongoDB root username |
-| `MONGO_DB_NAME` | `job_scraper` | Database name |
-| `MONGO_COLLECTION_NAME` | `scrape_runs` | Scrape history collection |
-| `CLAUDE_CONFIG_DIR` | — | Host path to `.claude` directory (mounted into bot) |
-| `CLAUDE_CONFIG_FILE` | — | Host path to `.claude.json` (mounted into bot) |
-| `TZ` | `Asia/Jakarta` | Timezone for the bot container |
+| Variable                | Default        | Purpose                                             |
+| ----------------------- | -------------- | --------------------------------------------------- |
+| `MONGO_ROOT_USER`       | `admin`        | MongoDB root username                               |
+| `MONGO_DB_NAME`         | `job_scraper`  | Database name                                       |
+| `MONGO_COLLECTION_NAME` | `scrape_runs`  | Scrape history collection                           |
+| `CLAUDE_CONFIG_DIR`     | —              | Host path to `.claude` directory (mounted into bot) |
+| `CLAUDE_CONFIG_FILE`    | —              | Host path to `.claude.json` (mounted into bot)      |
+| `TZ`                    | `Asia/Jakarta` | Timezone for the bot container                      |
