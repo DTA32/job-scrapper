@@ -1,5 +1,7 @@
 # Multi-site job scrape
 
+Execute all steps below now, in order. Do not ask for confirmation.
+
 ## Step 1 — Run the scraper
 
 Call the `job-scraper` MCP tool `scrape_jobs` with no arguments. It will run
