@@ -14,7 +14,16 @@ cd /workspace/scraper-bot
 #   --verbose alone does not stream. --verbose is required for stream-json.
 # Stream claude output to console + log, but capture *claude's* exit (not tee's).
 # POSIX sh has no ${PIPESTATUS}, so route the real rc through a file.
-{ claude --model claude-haiku-4-5-20251001 --dangerously-skip-permissions --verbose --output-format stream-json -p "$(cat "$PROMPT")" 2>&1; echo "$?" >"$LOG.rc"; } | tee -a "$LOG"
+{
+  claude \
+    --model claude-haiku-4-5-20251001 \
+    --dangerously-skip-permissions \
+    --verbose \
+    --output-format stream-json \
+    -p "$(cat "$PROMPT")" \
+    2>&1
+  echo "$?" >"$LOG.rc"
+} | tee -a "$LOG"
 EXIT_CODE="$(cat "$LOG.rc")"; rm -f "$LOG.rc"
 
 if [ "$EXIT_CODE" -ne 0 ]; then

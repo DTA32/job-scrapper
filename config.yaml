@@ -1,10 +1,12 @@
 keywords:
+  - full stack engineer
+  - architecture engineer
   - software engineer
   - back end engineer
   # - project manager
   # - product owner
   # - quality assurance
-  - data analyst
+  # - data analyst
   # - content writer
   # - seo
 
@@ -35,7 +37,7 @@ bot:
 max_age_hours: 72
 
 filter:
-  location: [jakarta, tangerang, bandung, bekasi, Indonesia]
+  location: [jakarta, tangerang, tangerang selatan, bandung, bekasi, Indonesia]
   # employment_type: [full-time, internship, contract, part-time]
   # work_type: [remote, hybrid, onsite]
 
