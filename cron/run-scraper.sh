@@ -27,7 +27,7 @@ cd /workspace/scraper-bot
 # POSIX sh has no ${PIPESTATUS}, so route the real rc through a file.
 {
   claude \
-    --model claude-haiku-4-5 \
+    --model claude-sonnet-5 \
     --mcp-config "$MCP_CONFIG" \
     --strict-mcp-config \
     --dangerously-skip-permissions \
