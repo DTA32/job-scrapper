@@ -100,3 +100,6 @@ config.dev.patch.yaml
 
 # Real k8s Secret (holds Atlas URI + Discord webhook) — copy from the .example
 k8s/secret.yaml
+
+# Generated wilayah dataset (4MB, regenerate from cahyadsn/wilayah)
+seeds/wilayah.mongosh.js
