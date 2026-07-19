@@ -45,27 +45,31 @@ print("dropped _tui_healthcheck -- mongo OK")
 """
 
 # Copied verbatim from prompts/scrape-and-post.md (the bot's real send path):
-# reads token + channel + MSG from the container env, posts one message.
+# reads the webhook URL + MSG from the container env, posts one message.
 _DISCORD_SEND_JS = """\
+const {URL} = require('url');
 const https = require('https');
+const u = new URL(process.env.DISCORD_WEBHOOK_URL);
 const body = JSON.stringify({content: process.env.MSG});
 const req = https.request({
-  hostname: 'discord.com',
-  path: '/api/v10/channels/' + process.env.DISCORD_CHANNEL_ID + '/messages',
+  hostname: u.hostname,
+  path: u.pathname + u.search,
   method: 'POST',
   headers: {
-    'Authorization': 'Bot ' + process.env.DISCORD_BOT_TOKEN,
     'Content-Type': 'application/json',
     'Content-Length': Buffer.byteLength(body)
   }
 }, res => {
   let d=''; res.on('data',c=>d+=c);
-  res.on('end',()=>{const r=JSON.parse(d); console.log(r.id ? 'sent: '+r.id : 'error: '+JSON.stringify(r));});
+  res.on('end',()=>{
+    const ok = res.statusCode >= 200 && res.statusCode < 300;
+    console.log(ok ? 'sent' : 'error: ' + res.statusCode + ' ' + d);
+  });
 });
 req.write(body); req.end();
 """
 
-_DISCORD_TEST_MESSAGE = "✅ manage.py TUI discord test — bot token + channel reachable"
+_DISCORD_TEST_MESSAGE = "✅ manage.py TUI discord test — webhook reachable"
 
 
 @dataclass(frozen=True)
@@ -202,7 +206,7 @@ def build_test(test: str) -> list[Command]:
             )
         ]
     if test == "discord":
-        # TOKEN + CHANNEL_ID already live in the bot container env; only MSG is
+        # DISCORD_WEBHOOK_URL already lives in the bot container env; only MSG is
         # injected here.
         return [
             Command(
