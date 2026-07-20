@@ -34,13 +34,10 @@ If `exit_code != 0` or `errors` is non-empty, include a one-line
 diagnostic at the top of the Discord output. Continue and post whatever
 jobs DID land — partial output beats silence.
 
-## Step 2 — Pull formatting config
-
-The message template is a file; the character cap is an environment variable:
+## Step 2 — Pull the message template
 
 ```sh
 TEMPLATE="$(cat /workspace/scraper-bot/prompts/response_template.md)"
-MAX_CHARS="${MAX_CHARS:-1900}"
 ```
 
 `TEMPLATE` carries `{placeholder}` tokens that match canonical Job field
@@ -102,76 +99,82 @@ Emit the block as **its own heading line, then at most 3 bullets**, each at most
 If the per-site result has `count: 0`, skip silently (don't post a
 "no jobs found" message — too noisy).
 
-## Step 4 — Batch jobs into messages, then post to Discord
+## Step 4 — Assemble the digest file
 
-The destination is a Discord **webhook URL** from the environment:
-
-- `DISCORD_WEBHOOK_URL` — the full webhook URL
-  (`https://discord.com/api/webhooks/<id>/<token>`)
-
-**Batching.** Do not send one message per job — a 29-job run produced 30
-messages in testing, which reads as spam. Pack multiple jobs per message:
-
-- Group by keyword, and open each message with that keyword as a level-1 header
-  (`# software engineer`). Job titles in the template are level-2, so the keyword
-  must stay level-1 or the two render at the same weight. A single message never
-  mixes keywords.
-- Greedily append formatted jobs to the current message while the assembled
-  text stays within `MAX_CHARS`. When the next job would push it over, send
-  the current message and start a new one, repeating the keyword header.
-- **Never split one job across two messages.**
-- Separate consecutive jobs inside a message with a `---` line.
-- If a single job exceeds `MAX_CHARS` on its own, truncate that job to fit and
-  append `…`.
-
-`MAX_CHARS` caps the **assembled message**, not the per-job block. Discord's own
-hard limit is 2000, so `MAX_CHARS` must stay at or below that.
-
-**Posting.** One HTTP request per assembled message, via `node` — read the
-webhook URL from the environment inside the script, never inline it.
-Webhooks are rate-limited (~30 requests/minute): on HTTP 429 read the
-`retry_after` value from the JSON body and sleep that many seconds before
-retrying that message; otherwise pause briefly (~1s) between posts.
+Everything the run produced goes into **one markdown file**, not into chat
+messages. Write it to:
 
 ```sh
-export MSG=<one assembled message (keyword header + its batched jobs)>
-node -e "
-const {URL} = require('url');
-const https = require('https');
-const u = new URL(process.env.DISCORD_WEBHOOK_URL);
-const body = JSON.stringify({content: process.env.MSG});
-const req = https.request({
-  hostname: u.hostname,
-  path: u.pathname + u.search,
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    'Content-Length': Buffer.byteLength(body)
-  }
-}, res => {
-  let d=''; res.on('data',c=>d+=c);
-  res.on('end',()=>{
-    const ok = res.statusCode >= 200 && res.statusCode < 300;
-    console.log(ok ? 'sent' : 'error: ' + res.statusCode + ' ' + d);
-  });
-});
-req.write(body); req.end();
-"
+DIGEST_PATH="/tmp/jobs-$(date +%F).md"
 ```
 
-A successful webhook POST returns `204 No Content` (empty body), so key
-success off the 2xx status code, not a parsed response id.
+`TZ=Asia/Jakarta` is set in the container, so `date +%F` is already the WIB date.
+Use the `Write` tool for the file — job text contains backticks and `$`, which a
+shell heredoc would mangle unless quoted.
 
-## Step 5 — Summary footer (optional)
+Structure, top to bottom:
 
-After all individual job messages, send one final summary line:
+1. A bold title line and an italic summary line — **plain text, not headings**,
+   so they don't compete with the keyword headers below:
+
+   ```md
+   **Job digest — Friday, 20 July 2026**
+
+   _Scraped 29 jobs across 5 keyword(s) and 4 site(s). Errors: 1._
+   ```
+
+2. One `# <keyword>` section per keyword that produced jobs (level-1; job titles
+   from the template are level-2, so the hierarchy holds).
+
+3. Under each keyword, the formatted job blocks from Step 3.
+
+Separate **every** block with a blank line, then `---`, then a blank line — after
+the title/summary header, between jobs, and before each new `# <keyword>`
+heading. Two reasons:
+
+- The blank line before `---` matters now that this is a real file: `---`
+  directly under text is a setext heading, not a horizontal rule.
+- `send-digest.js` splits oversized digests on exactly that separator, so a
+  missing one welds two jobs into an unsplittable block.
+
+Skip keywords and sites with `count: 0` — no "no jobs found" filler.
+
+There is no per-message character budget any more. Do **not** truncate, drop or
+summarize jobs to make things fit; the sender handles size (see Step 5).
+
+## Step 5 — Send the digest to Discord
+
+One command. Do not write your own HTTP code — `cron/send-digest.js` owns the
+upload, the 10 MiB split, rate-limit retries and the fallback path:
+
+```sh
+DIGEST_PATH="/tmp/jobs-$(date +%F).md" \
+DIGEST_SUMMARY="<summary line, prefixed by the error diagnostic if any>" \
+  node /workspace/scraper-bot/cron/send-digest.js
+```
+
+(Spell the path out again — each shell call is a fresh process, so a variable set
+in Step 4 is gone by now.)
+
+- `DISCORD_WEBHOOK_URL` is already in the container env; never pass it as an
+  argument and never inline it.
+- `DIGEST_SUMMARY` is the visible message body — it carries the same footer that
+  used to be its own message:
+  `Scraped {total_jobs} jobs across {len(keywords)} keyword(s) and
+  {len(requested_sites)} site(s). Errors: {len(errors)}.`
+  If Step 1 reported `exit_code != 0` or a non-empty `errors`, put the one-line
+  diagnostic on the line above it.
+- If `total_jobs == 0`, skip Steps 4 and 5 entirely — no file, no post.
+
+The script prints one machine-readable line as its last output:
 
 ```
-Scraped {total_jobs} jobs across {len(keywords)} keyword(s) and
-{len(requested_sites)} site(s). Errors: {len(errors)}.
+RESULT {"mode":"attachment","messages_sent":1,"parts":1,"bytes":48213,"failed":0}
 ```
 
-Skip this footer if `total_jobs == 0` (the run produced nothing useful).
+`mode` is `attachment` (normal), `inline` (every upload failed, jobs went out as
+plain messages), or `mixed`. Read these numbers from that line in Step 6 — do
+not recompute them.
 
 ## Step 6 — Record the Discord outcome in MongoDB
 
@@ -187,22 +190,23 @@ Otherwise call the `job-scraper` MCP tool `update_scrape_run` with:
 {
   "run_id": "<mongo_id from Step 1>",
   "patch": {
-    "discord_sent_status": "<'success' if no posts failed, else 'failed'>",
+    "discord_sent_status": "<'success' if RESULT.failed == 0, else 'failed'>",
     "run_metadata.bot_post_status": {
-      "total_posted": "<number of Discord messages sent successfully>",
-      "total_jobs_posted": "<number of jobs carried by those messages>",
-      "failed": "<number of messages that errored or got a non-2xx response>"
+      "total_posted": "<RESULT.messages_sent>",
+      "total_jobs_posted": "<number of jobs you wrote into the digest>",
+      "failed": "<RESULT.failed>",
+      "delivery_mode": "<RESULT.mode>"
     }
   }
 }
 ```
 
 Notes:
-- Since Step 4 batches, messages and jobs are different counts — report both.
-  `total_jobs_posted` is what reconciles against the run's job total;
-  `total_posted` and `failed` are message counts.
-- `discord_sent_status` is `"success"` when `failed == 0` (including when there
-  were no jobs to post), else `"failed"`.
+- `total_posted` is a *message* count — normally `1`, more when the digest was
+  split or the fallback fired. `total_jobs_posted` is the job count that
+  reconciles against the run total, and is the only field you supply yourself.
+- `delivery_mode` records whether the run degraded to inline posting, which is
+  otherwise invisible after the fact.
 - **Never** put `DISCORD_WEBHOOK_URL` (it embeds a secret token) in the patch.
 - The `"run_metadata.bot_post_status"` dot-notation key updates the nested field
   without overwriting the rest of `run_metadata`.
@@ -216,6 +220,8 @@ Notes:
 - `scrape_jobs` already applies cross-run deduplication server-side: it only
   returns jobs not seen in previous runs, and never the same posting twice
   within a run. Just post everything it returns — no extra dedup needed.
-- The message template (`prompts/response_template.md`) and `MAX_CHARS` are read
-  fresh on every run, so editing the template file or the env var is enough —
-  no prompt rewrite needed.
+- The message template (`prompts/response_template.md`) is read fresh on every
+  run, so editing the template file is enough — no prompt rewrite needed.
+- `MAX_CHARS` no longer shapes normal output. It only caps the inline messages
+  `send-digest.js` falls back to when uploads fail, and the script reads it
+  itself.
