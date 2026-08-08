@@ -14,9 +14,19 @@ spec:
       labels:
         app: job-scraper-mcp
     spec:
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values:
+                      - dta32-homeserver
       containers:
         - name: job-scraper-mcp
-          image: replacedbycicd
+          image: dta32/job-scrapper-orangemangodimz-mcp:v1.0.2 # or replacedbycicd
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080

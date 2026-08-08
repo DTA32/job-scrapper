@@ -1,0 +1,44 @@
+flowchart LR
+    subgraph clients["MCP clients"]
+        BOT["CronJob bot pod<br/>claude --mcp-config .mcp.json"]
+        DEV["Host claude CLI<br/>localhost:8080/mcp"]
+    end
+
+    SVC["Service job-scraper-mcp-service<br/>ClusterIP 80 to 8080"]
+
+    subgraph dep["Deployment job-scraper-mcp - replicas 1"]
+        APP["FastMCP 'job-scraper'<br/>transport streamable-http<br/>MCP_HOST 0.0.0.0 : MCP_PORT 8080"]
+        HEALTH["GET /health<br/>mongo.ping in threadpool<br/>200 ok / 503 degraded"]
+
+        subgraph tools["@mcp.tool surface"]
+            direction TB
+            T1["list_sites<br/>get_config<br/>get_scrape_response_structure"]
+            T2["update_config<br/>deep-merge, validate on temp file,<br/>timestamped .bak, atomic write"]
+            T3["get_scrape_status<br/>logs/status.json + last 30 log lines"]
+            T4["insert_scrape_run<br/>get_latest_scrape_run<br/>update_scrape_run"]
+            T5["test_proxy_connection<br/>curl_cffi GET through proxy"]
+            T6["scrape_jobs - the workhorse<br/>see mcp-scrape-jobs.mermaid"]
+        end
+    end
+
+    CFG[("config.yaml<br/>baked into the image")]
+    MONGO[("MongoDB<br/>scrape_runs / seen_jobs / wilayah")]
+    SITES(["Job boards<br/>jobstreet, glints, linkedin, indeed"])
+    LOGS[("logs/status.json<br/>logs/scraper.log")]
+
+    BOT --> SVC
+    DEV -.->|"published host port"| APP
+    SVC --> APP
+    APP --> tools
+    APP --> HEALTH
+
+    T1 --> CFG
+    T2 --> CFG
+    T3 --> LOGS
+    T4 --> MONGO
+    T5 --> SITES
+    T6 --> CFG
+    T6 --> SITES
+    T6 --> MONGO
+    T6 --> LOGS
+    HEALTH --> MONGO

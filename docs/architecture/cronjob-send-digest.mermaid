@@ -1,0 +1,36 @@
+flowchart TD
+    IN["node cron/send-digest.js<br/>env DISCORD_WEBHOOK_URL, DIGEST_PATH, DIGEST_SUMMARY,<br/>MAX_FILE_BYTES default 10 MiB, MAX_CHARS default 1900"]
+    IN --> READ["read the digest, measure Buffer.byteLength utf8"]
+    READ --> BUDGET["budget = max(MAX_FILE_BYTES - 8192 multipart overhead, 4096 floor)"]
+    BUDGET --> SPLIT["splitByBytes on the job separator blank line, ---, blank line<br/>never cuts a job; a single oversized job is truncated alone"]
+    SPLIT --> LOOP["for each part i of N"]
+
+    LOOP --> POST["multipart POST<br/>payload_json = summary on part 1, part i/N suffix<br/>files[0] = jobs-YYYY-MM-DD.partIofN.md"]
+    POST --> RETRY{"postWithRetries<br/>max 3 attempts"}
+    RETRY -->|"429"| WAIT1["sleep retry_after from the body"] --> POST
+    RETRY -->|"5xx or transport error"| WAIT2["sleep 2s"] --> POST
+    RETRY -->|"2xx"| OK["sent++, attachmentParts++"]
+    RETRY -->|"still failing after 3"| FALLBACK
+
+    subgraph fb["inline fallback - last resort"]
+        direction TB
+        FALLBACK["sendInline"]
+        CHUNK["splitByChars to MAX_CHARS characters<br/>Discord measures content in chars, uploads in bytes"]
+        PLAIN["POST plain content messages, same retry policy<br/>summary rides on the first chunk only"]
+        FALLBACK --> CHUNK --> PLAIN
+    end
+
+    OK --> PAUSE["sleep 1s between messages"]
+    PLAIN --> PAUSE
+    PAUSE --> LOOP
+
+    LOOP -->|"all parts done"| MODE{"attachmentParts == 0?"}
+    MODE -->|"yes"| M1["mode = inline"]
+    MODE -->|"no, some inline"| M2["mode = mixed"]
+    MODE -->|"no, none inline"| M3["mode = attachment"]
+
+    M1 --> OUT
+    M2 --> OUT
+    M3 --> OUT
+    OUT["print one line:<br/>RESULT mode, messages_sent, parts, bytes, failed<br/>exit 1 when failed &gt; 0"]
+    OUT --> STEP6["the prompt lifts these numbers straight into<br/>update_scrape_run - step 6, never recomputed"]

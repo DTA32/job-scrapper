@@ -10,9 +10,19 @@ spec:
     spec:
       template:
         spec:
+          affinity:
+            nodeAffinity:
+              preferredDuringSchedulingIgnoredDuringExecution:
+                - weight: 100
+                  preference:
+                    matchExpressions:
+                      - key: kubernetes.io/hostname
+                        operator: In
+                        values:
+                          - vps-01eb7b22
           containers:
             - name: job-scraper-bot
-              image: replacedbycicd
+              image: dta32/job-scrapper-orangemangodimz-bot:v1.0.6 # or replacedbycicd
               imagePullPolicy: IfNotPresent
               command:
                 - /bin/sh

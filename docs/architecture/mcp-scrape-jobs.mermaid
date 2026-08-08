@@ -1,0 +1,76 @@
+flowchart TD
+    START["scrape_jobs(sites=None, keywords=None)"] --> LOAD["config_loader.load config.yaml to AppConfig"]
+    LOAD -->|"ConfigError"| CFGERR["return {error: str}"]
+    LOAD --> TARGETS["targets = sites or config.enabled_site_names<br/>kw = keywords or config.keywords"]
+    TARGETS --> RUN["scraper.runner.run(config, targets, keywords)"]
+
+    subgraph runner["runner.run - setup"]
+        direction TB
+        PAIRS["build keyword x site cross-product pairs"]
+        CHAIN["default_fetch_chain(proxy)<br/>CurlCffi to Cloudscraper to Playwright"]
+        IDX["refresh_index - load wilayah index from Mongo<br/>single-threaded, fails soft to substring match"]
+        SEEN["SeenStore - Mongo seen_jobs, unique index on dedup_key<br/>shared across every pair in the run"]
+        POOL["ThreadPoolExecutor<br/>workers = min(config.concurrency, len(pairs))"]
+        PAIRS --> CHAIN --> IDX --> SEEN --> POOL
+    end
+
+    RUN --> runner
+
+    subgraph worker["run_one - per (keyword, site) pair"]
+        direction TB
+        URL["site.url_for(keyword)<br/>max_pages_for(site, api_backed)"]
+        PAGE{"page &lt; max_pages<br/>and limit not reached?"}
+        FETCH["FetchChain.fetch(page_url)<br/>first fetcher returning a non-challenge body wins"]
+        NOHTML{"empty body and<br/>requires_search_html?"}
+        FAILJSON["write site.json with error + per-fetcher attempts<br/>reset site.raw.json, return"]
+        PARSE["scraper.collect(body) to list[Job]<br/>HTML selectors or API JSON"]
+        ENRICH["_enrich_jobs - stamp matched_keyword, parse posted_at"]
+        STOP{"stop signals:<br/>zero jobs / page repeats earlier keys /<br/>whole page past max_age cutoff"}
+        RAWACC["accumulate all_raw, deduped by dedup_key"]
+        FILTER["per job: max_age cutoff, then content filter<br/>location via wilayah prefixes, then seen.is_seen<br/>keep until scraper.limit NEW jobs"]
+        NEXT["page += 1, sleep page_delay_sec"]
+        RAWOUT["write site.raw.json - every parsed job, canonical fields"]
+        REQS["_fetch_requirements - refetch detail pages, max 4 threads<br/>host allow-list, _truncate_requirements anchored on<br/>'requirements/kualifikasi', capped at requirements_max_chars"]
+        PROJ["project_jobs to config.fields_for(site)"]
+        JSONOUT["write site.json - keyword, fields, max_age_hours,<br/>filter, count, jobs"]
+        MARK["seen.mark_seen - upsert dedup_keys to Mongo"]
+
+        URL --> PAGE
+        PAGE -->|"yes"| FETCH --> NOHTML
+        NOHTML -->|"yes, on page 0"| FAILJSON
+        NOHTML -->|"no"| PARSE --> ENRICH --> STOP
+        STOP -->|"stop"| RAWOUT
+        STOP -->|"continue"| RAWACC --> FILTER --> NEXT --> PAGE
+        PAGE -->|"no"| RAWOUT
+        RAWOUT --> REQS --> PROJ --> JSONOUT --> MARK
+    end
+
+    POOL --> worker
+    FILES["output/&lt;keyword-slug&gt;/&lt;site&gt;.json<br/>output/&lt;keyword-slug&gt;/&lt;site&gt;.raw.json"]
+    MARK --> FILES
+    FAILJSON --> FILES
+
+    subgraph collect["back in server.py - read the files back"]
+        direction TB
+        READ["for each keyword x site: read .raw.json and .json"]
+        MISS{"filtered payload<br/>missing or invalid?"}
+        ERR1["errors += 'missing or invalid output JSON'"]
+        HASERR{"payload has an 'error' key?"}
+        ERR2["errors += reason + per-fetcher attempts"]
+        NORM["_normalize_site_payload<br/>project to JOB_FIELD_ORDER, null-fill missing fields"]
+        READ --> MISS
+        MISS -->|"yes"| ERR1
+        MISS -->|"no"| HASERR
+        HASERR -->|"yes"| ERR2
+        HASERR -->|"no"| NORM
+    end
+
+    FILES --> collect
+    RUN -->|"exit_code"| collect
+
+    collect --> RESULT["assemble result<br/>ok = errors empty, keywords, requested_sites,<br/>exit_code, results grouped by keyword, errors"]
+    RESULT --> STATUS["_write_status to logs/status.json<br/>last_run, last_error, per_site merged with prior run"]
+    STATUS --> INSERT["mongo.insert_run - ONE doc per run<br/>run_metadata + filtered_results + raw_results + note"]
+    INSERT -->|"Mongo unreachable"| LOGERR["log the error, mongo_id = null"]
+    INSERT --> RET["return {...result, mongo_id}"]
+    LOGERR --> RET

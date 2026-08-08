@@ -1,0 +1,51 @@
+sequenceDiagram
+    autonumber
+    participant KC as kube-controller
+    participant SH as run-scraper.sh
+    participant CL as claude session
+    participant MCP as job-scraper MCP
+    participant ND as node send-digest.js
+    participant DC as Discord webhook
+
+    KC->>SH: start pod at 20:00 WIB
+    SH->>CL: claude -p prompts/scrape-and-post.md
+    Note over CL: steps below are the prompt, executed in order
+
+    rect rgb(238, 244, 255)
+        Note over CL,MCP: Step 1 - run the scraper
+        CL->>MCP: scrape_jobs, no arguments
+        Note right of MCP: all scraping, filtering, dedup and the<br/>run-document insert happen inside.<br/>see mcp-scrape-jobs.mermaid
+        MCP-->>CL: ok, keywords, requested_sites, exit_code,<br/>results, errors, mongo_id
+    end
+
+    alt exit_code non-zero or errors non-empty
+        Note over CL: keep going, prepend a one-line diagnostic<br/>partial output beats silence
+    end
+
+    alt total_jobs == 0
+        Note over CL: skip steps 4 and 5 entirely - no file, no post
+    else jobs were returned
+        Note over CL: Step 2 - cat prompts/response_template.md
+        Note over CL: Step 3 - per job, substitute {field} tokens<br/>drop null placeholders not whole lines<br/>normalize posted_date to WIB weekday date<br/>render requirements as up to 3 bullets
+        Note over CL: Step 4 - Write /tmp/jobs-YYYY-MM-DD.md<br/>title + summary, one H1 per keyword,<br/>every block separated by blank line, ---, blank line
+
+        rect rgb(240, 248, 240)
+            Note over CL,DC: Step 5 - deliver
+            CL->>ND: DIGEST_PATH + DIGEST_SUMMARY, env carries the webhook
+            ND->>DC: upload, split and retry per cronjob-send-digest.mermaid
+            DC-->>ND: 2xx / 429 / 5xx
+            ND-->>CL: RESULT mode, messages_sent, parts, bytes, failed
+        end
+    end
+
+    alt mongo_id is null
+        Note over CL: skip step 6, Mongo was unreachable at scrape time
+    else
+        Note over CL,MCP: Step 6 - record the Discord outcome
+        CL->>MCP: update_scrape_run run_id=mongo_id, patch=<br/>discord_sent_status + run_metadata.bot_post_status
+        Note right of MCP: patches the SAME run document,<br/>never a second insert.<br/>numbers come from the RESULT line, not recall
+        MCP-->>CL: ok true/false
+    end
+
+    CL-->>SH: exit code
+    SH->>SH: tee to cron/scraper.log, log ERROR if non-zero
