@@ -3,6 +3,10 @@ kind: ConfigMap
 metadata:
   name: job-scraper-config
 data:
+  # Model the bot's claude CLI runs the digest prompt with (consumed by
+  # cron/run-scraper.sh). Must be served by whatever endpoint the
+  # claude-config PVC points the CLI at.
+  BOT_MODEL: "qwen3.8-max"
   MONGO_DB_NAME: "job-scraper"
   MONGO_COLLECTION_NAME: "scrape_runs"
   MONGO_SERVER_SELECTION_TIMEOUT_MS: "3000"

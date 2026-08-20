@@ -18,8 +18,8 @@ Diagrams live beside this file as standalone `.mermaid` sources.
 run is still going. Each tick creates a Job whose pod overrides the image
 `CMD` with `/bin/sh cron/run-scraper.sh`.
 
-The pod takes env from the ConfigMap (`TZ`, `MAX_CHARS`, Mongo db/collection
-names, the `CLAUDE_CONFIG_*` paths) and the Secret (`MONGO_URI`,
+The pod takes env from the ConfigMap (`BOT_MODEL`, `TZ`, `MAX_CHARS`, Mongo
+db/collection names, the `CLAUDE_CONFIG_*` paths) and the Secret (`MONGO_URI`,
 `DISCORD_WEBHOOK_URL` — that's all of it). There are no Anthropic credentials
 in either: auth comes solely from `job-scraper-claude-pvc`, mounted at
 `/claude-config`, which is where `CLAUDE_CONFIG_DIR` and `CLAUDE_CONFIG_FILE`

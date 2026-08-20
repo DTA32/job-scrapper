@@ -13,7 +13,8 @@
 // Env:
 //   DISCORD_WEBHOOK_URL  required, https://discord.com/api/webhooks/<id>/<token>
 //   DIGEST_PATH          required, path to the markdown digest
-//   DIGEST_SUMMARY       message body (summary + error diagnostic); may be empty
+//   DIGEST_SUMMARY       message body (title + summary, error diagnostic above
+//                        them when present); may be empty
 //   MAX_FILE_BYTES       upload cap, default 10 MiB (Discord non-boosted)
 //   MAX_CHARS            per-message cap for the inline fallback, default 1900
 //

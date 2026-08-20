@@ -5,6 +5,15 @@
 LOG=/workspace/scraper-bot/cron/scraper.log
 PROMPT=/workspace/scraper-bot/prompts/scrape-and-post.md
 MCP_CONFIG=/workspace/scraper-bot/.mcp.json
+# BOT_MODEL (env): model name passed to `claude --model`. Injected via the k8s
+#   ConfigMap (k8s/configmap.yaml -> envFrom) or via .env for docker-compose.
+#   Falls back to claude-sonnet-5 when unset/empty, so runs without it keep
+#   today's behavior. Which endpoint serves that model is decided by the
+#   claude-config PVC (CLAUDE_CONFIG_DIR/FILE), not here. Resolved below and
+#   re-exported so the prompt can quote it in the Discord summary line
+#   ("using {bot_model}").
+BOT_MODEL="${BOT_MODEL:-claude-sonnet-5}"
+export BOT_MODEL
 
 echo "[$(date)] starting multi-site scraper run..." | tee -a "$LOG"
 cd /workspace/scraper-bot
@@ -27,7 +36,7 @@ cd /workspace/scraper-bot
 # POSIX sh has no ${PIPESTATUS}, so route the real rc through a file.
 {
   claude \
-    --model claude-sonnet-5 \
+    --model "$BOT_MODEL" \
     --mcp-config "$MCP_CONFIG" \
     --strict-mcp-config \
     --dangerously-skip-permissions \

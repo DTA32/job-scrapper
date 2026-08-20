@@ -27,11 +27,11 @@ sequenceDiagram
     else jobs were returned
         Note over CL: Step 2 - cat prompts/response_template.md
         Note over CL: Step 3 - per job, substitute {field} tokens<br/>drop null placeholders not whole lines<br/>normalize posted_date to WIB weekday date<br/>render requirements as up to 3 bullets
-        Note over CL: Step 4 - Write /tmp/jobs-YYYY-MM-DD.md<br/>title + summary, one H1 per keyword,<br/>every block separated by blank line, ---, blank line
+        Note over CL: Step 4 - Write /tmp/jobs-YYYY-MM-DD.md<br/>no header, starts at the first H1 keyword,<br/>every block separated by blank line, ---, blank line
 
         rect rgb(240, 248, 240)
             Note over CL,DC: Step 5 - deliver
-            CL->>ND: DIGEST_PATH + DIGEST_SUMMARY, env carries the webhook
+            CL->>ND: DIGEST_PATH + DIGEST_SUMMARY<br/>summary = title + summary lines, now the message body
             ND->>DC: upload, split and retry per cronjob-send-digest.mermaid
             DC-->>ND: 2xx / 429 / 5xx
             ND-->>CL: RESULT mode, messages_sent, parts, bytes, failed

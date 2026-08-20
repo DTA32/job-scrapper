@@ -10,7 +10,7 @@ cluster. This replaces the docker-compose + supercronic setup.
 | `deployment.yaml` | Deployment `job-scraper-mcp` | Long-running MCP HTTP server (port 8080) |
 | `service.yaml` | Service `job-scraper-mcp-service` | ClusterIP so the bot reaches the MCP in-cluster |
 | `cronjob.yaml` | CronJob `job-scraper-bot` | Daily scrape+post via claude-code (replaces supercronic) |
-| `configmap.yaml` | ConfigMap `job-scraper-config` | Non-secret env (DB name, TZ, MAX_CHARS, CLAUDE_CONFIG_*) |
+| `configmap.yaml` | ConfigMap `job-scraper-config` | Non-secret env (BOT_MODEL, DB name, TZ, MAX_CHARS, CLAUDE_CONFIG_*) |
 | `secret.example.yaml` | Secret `job-scraper-secret` | Template for `MONGO_URI` (Atlas) + `DISCORD_WEBHOOK_URL`; copy to `secret.yaml` (gitignored) |
 | `pv.yaml` / `pvc.yaml` | PV/PVC `job-scraper-claude-*` | hostPath volume holding the Claude Code session auth |
 

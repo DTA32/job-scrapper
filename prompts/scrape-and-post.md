@@ -114,22 +114,17 @@ shell heredoc would mangle unless quoted.
 
 Structure, top to bottom:
 
-1. A bold title line and an italic summary line — **plain text, not headings**,
-   so they don't compete with the keyword headers below:
-
-   ```md
-   **Job digest — Friday, 20 July 2026**
-
-   _Scraped 29 jobs across 5 keyword(s) and 4 site(s). Errors: 1._
-   ```
-
-2. One `# <keyword>` section per keyword that produced jobs (level-1; job titles
+1. One `# <keyword>` section per keyword that produced jobs (level-1; job titles
    from the template are level-2, so the hierarchy holds).
 
-3. Under each keyword, the formatted job blocks from Step 3.
+2. Under each keyword, the formatted job blocks from Step 3.
 
-Separate **every** block with a blank line, then `---`, then a blank line — after
-the title/summary header, between jobs, and before each new `# <keyword>`
+The digest's title and summary lines do **not** go in this file — they moved to
+the Discord message body (see Step 5). The file starts directly at the first
+`# <keyword>` heading.
+
+Separate **every** block with a blank line, then `---`, then a blank line —
+between jobs, and between the last job of a keyword and the next `# <keyword>`
 heading. Two reasons:
 
 - The blank line before `---` matters now that this is a real file: `---`
@@ -149,7 +144,7 @@ upload, the 10 MiB split, rate-limit retries and the fallback path:
 
 ```sh
 DIGEST_PATH="/tmp/jobs-$(date +%F).md" \
-DIGEST_SUMMARY="<summary line, prefixed by the error diagnostic if any>" \
+DIGEST_SUMMARY="<title line, blank line, summary line — error diagnostic above them if any>" \
   node /workspace/scraper-bot/cron/send-digest.js
 ```
 
@@ -158,12 +153,25 @@ in Step 4 is gone by now.)
 
 - `DISCORD_WEBHOOK_URL` is already in the container env; never pass it as an
   argument and never inline it.
-- `DIGEST_SUMMARY` is the visible message body — it carries the same footer that
-  used to be its own message:
-  `Scraped {total_jobs} jobs across {len(keywords)} keyword(s) and
-  {len(requested_sites)} site(s). Errors: {len(errors)}.`
-  If Step 1 reported `exit_code != 0` or a non-empty `errors`, put the one-line
-  diagnostic on the line above it.
+- `DIGEST_SUMMARY` is the visible message body that accompanies the attachment.
+  It carries the header that used to open the digest file itself — a bold title
+  line and an italic summary line, separated by one blank line:
+
+  ```md
+  **Job digest — Thursday, 20 August 2026**
+
+  _Scraped 34 jobs across 5 keyword(s) and 4 site(s) using qwen3.8-max. Errors: 0._
+  ```
+
+  - Title line: `**Job digest — <today's WIB date>**`, with the date formatted
+    `Weekday, DD Month YYYY` exactly like a bare `{posted_date}` value
+    (`date +%F` is already WIB).
+  - Summary line: `_Scraped {total_jobs} jobs across {len(keywords)} keyword(s)
+    and {len(requested_sites)} site(s) using {bot_model}. Errors:
+    {len(errors)}._` — `{bot_model}` is the value of the `BOT_MODEL` env var,
+    always set in the container; it is the model name this run was started with.
+  - If Step 1 reported `exit_code != 0` or a non-empty `errors`, put the
+    one-line diagnostic on the line above the title line.
 - If `total_jobs == 0`, skip Steps 4 and 5 entirely — no file, no post.
 
 The script prints one machine-readable line as its last output:

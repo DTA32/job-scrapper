@@ -7,7 +7,7 @@ flowchart TB
         CJ -->|"fires, skipped if the last one still runs"| JOB --> POD
     end
 
-    CM[("ConfigMap job-scraper-config<br/>MONGO_DB_NAME, MONGO_COLLECTION_NAME,<br/>TZ, MAX_CHARS,<br/>CLAUDE_CONFIG_DIR, CLAUDE_CONFIG_FILE")]
+    CM[("ConfigMap job-scraper-config<br/>BOT_MODEL, MONGO_DB_NAME, MONGO_COLLECTION_NAME,<br/>TZ, MAX_CHARS,<br/>CLAUDE_CONFIG_DIR, CLAUDE_CONFIG_FILE")]
     SEC[("Secret job-scraper-secret<br/>MONGO_URI<br/>DISCORD_WEBHOOK_URL")]
     PVC[("PVC job-scraper-claude-pvc<br/>mounted at /claude-config<br/>the ONLY source of claude auth -<br/>seeded by a claude login elsewhere")]
 
@@ -18,7 +18,7 @@ flowchart TB
     subgraph container["inside the pod"]
         direction TB
         SH["cron/run-scraper.sh<br/>POSIX sh, tees everything to cron/scraper.log"]
-        CLAUDE["claude --model claude-sonnet-5<br/>--mcp-config .mcp.json --strict-mcp-config<br/>--dangerously-skip-permissions<br/>--verbose --output-format stream-json<br/>-p prompts/scrape-and-post.md"]
+        CLAUDE["claude --model $BOT_MODEL<br/>--mcp-config .mcp.json --strict-mcp-config<br/>--dangerously-skip-permissions<br/>--verbose --output-format stream-json<br/>-p prompts/scrape-and-post.md"]
         RC{"exit code == 0?"}
         OKLOG["log 'run complete'"]
         ERRLOG["log ERROR to stderr<br/>Job restarts per restartPolicy OnFailure"]
