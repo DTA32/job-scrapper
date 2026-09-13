@@ -1,0 +1,17 @@
+{
+  "name": "job-scraper-bot",
+  "private": true,
+  "description": "Deterministic digest pipeline: scrape via the job-scraper MCP server, render the digest, post it to Discord, record the run.",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "digest": "node run-digest.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.30.0",
+    "undici": "7.29.1"
+  }
+}
