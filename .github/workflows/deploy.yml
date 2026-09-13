@@ -50,8 +50,24 @@ jobs:
             ${{ steps.tags.outputs.latest }}
             ${{ steps.tags.outputs.sha }}
 
-  # 2. Build bot Docker image and push to ghcr.io
+  # 2. Test the bot (node --test), then build its Docker image and push to ghcr.io
+  test-bot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: cron/package-lock.json
+
+      - name: Install and test
+        working-directory: cron
+        run: npm ci --no-audit --no-fund && npm test
+
   build-bot:
+    needs: test-bot
     runs-on: ubuntu-latest
     permissions:
       contents: read
