@@ -13,6 +13,16 @@
       ]
     },
     {
+      "fixture": "glints-4ab448482442.txt",
+      "heading": "Kualifikasi",
+      "items": [
+        "Keterampilan dalam pembuatan API RESTful",
+        "Kandidat harus memiliki gelar S1",
+        "Kemampuan bekerja dalam tim dan komunikasi",
+        "PORTFOLIO REQUIRED"
+      ]
+    },
+    {
       "fixture": "glints-505018398de8.txt",
       "heading": "Kualifikasi",
       "items": [
@@ -24,11 +34,30 @@
       ]
     },
     {
+      "fixture": "glints-6843784c85b1.txt",
+      "heading": "Kualifikasi",
+      "items": [
+        "Pengalaman IT Data Analyst Minimal 3 tahun",
+        "Pendidikan minimal sarjana/S1",
+        "Bisa joint secepatnya dan onsite"
+      ]
+    },
+    {
       "fixture": "glints-91391d82f0e0.txt",
       "heading": "Kualifikasi",
       "items": [
         "Kami mencari kandidat yang memiliki gelar",
         "Kandidat harus memiliki kemampuan dalam"
+      ]
+    },
+    {
+      "fixture": "glints-a6ed94661bb3.txt",
+      "heading": "Kualifikasi",
+      "items": [
+        "Sehat Jasmani dan Rohani",
+        "Jujur, Sopan, Rapi, Bersih",
+        "Memiliki HP yang aktif",
+        "Memiliki kemampuan dalam pemasaran"
       ]
     },
     {
@@ -158,6 +187,17 @@
       ]
     },
     {
+      "fixture": "jobstreet-86e5b088622e.txt",
+      "heading": "Kualifikasi",
+      "items": [
+        "Bachelor degree or equivalent",
+        "0-2 years of experience in backend",
+        "Experienced in using Golang and Java",
+        "Experience working with RDBMS or NoSQL",
+        "Experience working with Redis and Memcached"
+      ]
+    },
+    {
       "fixture": "jobstreet-96455ab224b0.txt",
       "heading": "Kualifikasi",
       "items": [
@@ -177,6 +217,17 @@
         "Experience in the medical industry",
         "Good command of English",
         "Strong communication, analytical"
+      ]
+    },
+    {
+      "fixture": "jobstreet-cd9c2d351f1b.txt",
+      "heading": "Ringkasan",
+      "items": [
+        "Lead the architectural design of microservices",
+        "Diagnose high-stakes performance bottlenecks",
+        "Own end-to-end delivery of mission-critical",
+        "Drive code quality across the team",
+        "Oversee cloud infrastructure (AWS/GCP/Azure)"
       ]
     },
     {

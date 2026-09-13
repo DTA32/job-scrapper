@@ -113,7 +113,22 @@ const HAS_LINK_OR_EMAIL = new RegExp(LINK_OR_EMAIL.source, 'i');
 const CALL_TO_ACTION =
   /\b(apply now|apply here|apply via|click (here|the link)|kirim (cv|lamaran)|send (your )?(cv|resume)|lamar sekarang|segera lamar|daftar sekarang|only shortlisted|hanya kandidat|submit your (cv|resume|application)|apply today|we invite you to apply|mari bergabung|bergabung(lah)? bersama kami|kami menyambut)\b/i;
 const COMPANY_BLURB =
-  /\b(is a leading|is one of the|we are a|founded in|didirikan|merupakan perusahaan|adalah perusahaan|perusahaan yang bergerak|headquartered|berkantor pusat|is a fast[- ]growing|our mission|our vision|kami adalah|established in|sejak tahun)\b/i;
+  /\b(is a leading|is one of the|we are a|founded in|didirikan|(merupakan|adalah) (sebuah )?(perusahaan|agensi|agency|startup|platform|usaha)|perusahaan yang bergerak|headquartered|berkantor pusat|is a fast[- ]growing|our mission|our vision|kami adalah|established in|sejak tahun)\b/i;
+// Wording that marks a line or sentence as a requirement without any heading:
+// candidate traits at the start, years of experience, degrees, "is a plus", "kandidat harus".
+const QUALIFICATION_CUE = new RegExp(
+  [
+    String.raw`^(at least|minimum|min\.|minimal|pendidikan|pengalaman|memiliki|menguasai|mampu|bersedia|bisa|sehat|jujur|usia|pria|wanita|laki|lulusan|fresh graduate|bachelor|master|diploma|degree|experience (with|in|using|working)|experienced (in|with|using)|proficien|familiar|knowledge of|understanding of|strong (knowledge|understanding|background|experience|command|communication|skills?)|good (knowledge|understanding|command|communication)|excellent (communication|command)|able to|ability to|fluent|fluency)\b`,
+    String.raw`\b\d+(\s*[-–]\s*\d+)?\+?\s*(years?|yrs?|tahun)\b`,
+    String.raw`\b(bachelor|master)[’']?s? degree\b|\bdegree in\b|\bgelar (sarjana|s1|s2)\b|\b(d3|s1|s2)\b`,
+    String.raw`\bis a (plus|must)\b|\bare a plus\b|\b(is|are) required\b|\bnilai (tambah|plus)\b|\bdiutamakan\b|\bsangat penting untuk posisi\b`,
+    String.raw`\b(kandidat|pelamar|candidates?|applicants?) (harus|wajib|diharapkan|must|should|will need)\b|\b(harus|wajib) memiliki\b`,
+    String.raw`^[\w/&-]+(\s[\w/&-]+){0,3}\s(is\s)?(required|wajib|a must)[.!]?$`,
+  ].join('|'),
+  'u',
+);
+// Logistics and perks that employers list among the requirements ("Lokasi Depo ...", "Disediakan Mess").
+const INFO_ITEM = /^(lokasi|location|penempatan|placement|disediakan|tersedia|provided|benefits?|gaji|salary|mess)\b/i;
 const ABBREVIATIONS = new Set([
   'e.g', 'i.e', 'etc', 'min', 'max', 'no', 'dr', 'mr', 'mrs', 'ms', 'pt', 'tbk', 'jl', 'inc',
   'ltd', 'co', 'vs', 'approx', 'dll', 'dsb', 'dst', 'sr', 'jr', 'st', 'yrs', 'exp', 'u.s',
@@ -204,7 +219,7 @@ function isVocabularyOnly(text) {
 function looksLikeHeading(line) {
   if (line.startsWith('- ') || line.length > 80) return false;
   const words = line.split(/\s+/).length;
-  if (/[:：]$/.test(line)) return words <= 8;
+  if (/[:：]$/.test(line)) return words <= 12;
   if (/[.!?;,]$/.test(line) || words > 6) return false;
   return isVocabularyOnly(line);
 }
@@ -349,14 +364,22 @@ function truncate(text, maxChars) {
   return `${cut.replace(/[\s,;:(\-–—/]+$/, '')}…`;
 }
 
-function collectItems(blocks, { maxItems, maxItemChars, summary }) {
+function readsLikeRequirements(block) {
+  const items = blockItems(block).map(cleanItem).filter((item) => !isNoise(item));
+  const cued = items.filter((item) => QUALIFICATION_CUE.test(item.toLowerCase())).length;
+  return cued >= 2 && cued >= items.length / 2;
+}
+
+function collectItems(blocks, { maxItems, maxItemChars, summary, only, bySentence }) {
   const items = [];
   const seen = new Set();
   for (const block of blocks) {
     const headingKey = block.heading ? dedupeKey(block.heading) : null;
-    for (const raw of blockItems(block)) {
+    const candidates = bySentence ? block.lines.filter(Boolean).flatMap(sentences) : blockItems(block);
+    for (const raw of candidates) {
       const item = cleanItem(raw);
-      if (isNoise(item) || (summary && COMPANY_BLURB.test(item))) continue;
+      if (isNoise(item) || (summary ? COMPANY_BLURB.test(item) : INFO_ITEM.test(item))) continue;
+      if (only && !only(item)) continue;
       const key = dedupeKey(item);
       if (!key || seen.has(key) || key === headingKey) continue;
       seen.add(key);
@@ -387,11 +410,29 @@ function extractRequirements(outline, { maxItems = DEFAULT_MAX_ITEMS, maxItemCha
     if (items.length) return { heading: 'Kualifikasi', items };
   }
 
-  const duties = collectItems(
-    blocks.filter((block) => block.kind === 'responsibilities'),
-    { ...limits, summary: true },
-  );
-  if (duties.length) return { heading: 'Ringkasan', items: duties };
+  // No qualifications heading. A list that reads like requirements still is one, even
+  // under a duties heading an employer copy-pasted ("0-2 years of experience", "... is a plus").
+  const unheaded = blocks.filter((block) => block.kind !== 'qualifications' && !NOT_SUMMARY.has(block.kind));
+  const cuedLists = unheaded.filter((block) => isListLike(block) && readsLikeRequirements(block));
+  let found = collectItems(cuedLists, { ...limits, summary: false });
+  if (found.length) return { heading: 'Kualifikasi', items: found };
+
+  // Prose-only postings (Glints' generated descriptions): the sentences that state a requirement.
+  const cued = (item) => QUALIFICATION_CUE.test(item.toLowerCase());
+  found = collectItems(unheaded.filter((block) => !isListLike(block)), {
+    ...limits,
+    summary: false,
+    only: cued,
+    bySentence: true,
+  });
+  if (found.length) return { heading: 'Kualifikasi', items: found };
+
+  // Otherwise summarize the duties, their list before any prose about the role.
+  const duties = blocks.filter((block) => block.kind === 'responsibilities');
+  for (const group of [duties.filter(isListLike), duties.filter((block) => !isListLike(block))]) {
+    found = collectItems(group, { ...limits, summary: true });
+    if (found.length) return { heading: 'Ringkasan', items: found };
+  }
 
   const rest = collectItems(
     blocks.filter((block) => !NOT_SUMMARY.has(block.kind)),

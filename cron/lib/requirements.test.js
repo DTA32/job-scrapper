@@ -70,6 +70,47 @@ test('a pure requirements section beats a heading that also names the duties', (
   assert.deepEqual(items(outline), ['Kualifikasi', ['Connaissance des principes agile', 'Expérience COBOL']]);
 });
 
+test('without a qualifications heading, a list that reads like requirements is one', () => {
+  const outline = '- Pengalaman IT Data Analyst Minimal 3 tahun\n- Pendidikan minimal S1 dengan IPK 3,0\n- Bisa join secepatnya';
+  assert.deepEqual(items(outline), [
+    'Kualifikasi',
+    ['Pengalaman IT Data Analyst Minimal 3 tahun', 'Pendidikan minimal S1 dengan IPK 3,0', 'Bisa join secepatnya'],
+  ]);
+});
+
+test('a requirements list under a copy-pasted duties heading is found by its wording', () => {
+  const outline = [
+    '## Your main duties',
+    '- Build and extend our backend code',
+    '- Maintain the test suite',
+    '## Your main duties',
+    '- Bachelor degree in Computer Science',
+    '- 0-2 years of experience in backend development',
+    '- Experience with Redis is a plus',
+  ].join('\n');
+  assert.deepEqual(items(outline)[0], 'Kualifikasi');
+  assert.deepEqual(items(outline)[1][0], 'Bachelor degree in Computer Science');
+});
+
+test('prose-only postings keep just the sentences that state a requirement', () => {
+  const outline =
+    'Seorang iOS Developer bertanggung jawab merancang aplikasi. Kandidat harus memiliki gelar S1 dan pengalaman 1 hingga 3 tahun. Kemampuan komunikasi menjadi nilai tambah.\n\nPORTFOLIO REQUIRED. NO PORTFOLIO = DISQUALIFICATION';
+  assert.deepEqual(items(outline), [
+    'Kualifikasi',
+    ['Kandidat harus memiliki gelar S1 dan pengalaman 1 hingga 3 tahun.', 'Kemampuan komunikasi menjadi nilai tambah.', 'PORTFOLIO REQUIRED.'],
+  ]);
+});
+
+test('location and perk lines are not qualification bullets', () => {
+  const outline = 'Bagi Anda yang tertarik adalah syarat dan ketentuan yang diperlukan:\n\n- Lokasi Depo di Tebet\n- Sehat Jasmani dan Rohani\n- Disediakan Mess';
+  assert.deepEqual(items(outline), ['Kualifikasi', ['Sehat Jasmani dan Rohani']]);
+});
+
+test('a Ringkasan prefers the duties list over prose about the role', () => {
+  const outline = '## Get to Know the Role\nIn this role, you will design services.\n\n## The Critical Tasks You Will Perform\n- Lead the design\n- Diagnose bottlenecks';
+  assert.deepEqual(items(outline), ['Ringkasan', ['Lead the design', 'Diagnose bottlenecks']]);
+});
+
 test('a qualifications section wins over duties that come first', () => {
   const outline = '## Job Description\n- Build APIs\n\n## Qualifications\n- Go\n- SQL';
   assert.deepEqual(items(outline), ['Kualifikasi', ['Go', 'SQL']]);
