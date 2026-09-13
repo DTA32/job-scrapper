@@ -553,11 +553,13 @@ def get_latest_scrape_run() -> dict[str, Any]:
 def update_scrape_run(run_id: str, patch: dict[str, Any]) -> dict[str, Any]:
     """Patch an existing scrape run document (from scrape_jobs' mongo_id).
 
-    Used by the bot to add Discord columns to the SAME run document instead of
-    inserting a second one. Recommended patch keys:
-        channel_id: str (Discord channel id — NOT the bot token)
-        discord_sent_status: "success" | "failed"
-        run_metadata.bot_post_status: {total_posted, failed}  (dot-notation key)
+    Used by the bot (cron/run-digest.js) to add its Discord columns to the SAME
+    run document instead of inserting a second one. The bot sends:
+        discord_sent_status: "success" | "failed" | "skipped"
+        run_metadata.bot_post_status: {total_posted, total_jobs_posted, failed,
+            delivery_mode}  (dot-notation key; delivery_mode is
+            "attachment" | "mixed" | "inline" | "none")
+    Never put a webhook URL or bot token in a patch.
 
     Returns {ok: true, matched: <bool>} or {ok: false, error: <str>}.
     """

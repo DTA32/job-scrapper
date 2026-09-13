@@ -45,7 +45,7 @@ print("dropped _tui_healthcheck -- mongo OK")
 """
 
 # Writes a throwaway digest and posts it with cron/send-digest.js — the same
-# script the cron prompt calls, so this test can't drift from the real send path
+# script run-digest.js posts through, so this test can't drift from the real send path
 # the way an inlined copy of it did.
 _DISCORD_TEST_MESSAGE = "✅ manage.py TUI discord test — webhook reachable"
 
