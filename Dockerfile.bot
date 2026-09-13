@@ -1,0 +1,27 @@
+# Scheduled bot: node only, no LLM. Each invocation runs one digest
+# (cron/run-scraper.sh -> cron/run-digest.js): scrape via the MCP service, post to
+# Discord, record the run. Scheduling is owned by the k8s CronJob (k8s/cronjob.yaml),
+# so this image bundles no supercronic or crontab.
+FROM node:22-slim AS bot
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends curl ca-certificates tzdata \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace/scraper-bot
+
+# Dependencies before code, so a code-only change reuses the npm layer.
+COPY --chown=node:node ./cron/package.json ./cron/package-lock.json ./cron/
+RUN cd cron && npm ci --omit=dev --no-audit --no-fund
+
+COPY --chown=node:node ./cron    ./cron
+COPY --chown=node:node ./prompts ./prompts
+
+RUN chmod +x cron/entrypoint.sh cron/run-scraper.sh \
+ && chown -R node:node /workspace
+
+USER node
+
+# CronJob overrides this with an explicit command; kept as a sane default so the
+# image also runs a single digest when invoked directly.
+CMD ["/bin/sh", "/workspace/scraper-bot/cron/run-scraper.sh"]

@@ -65,9 +65,9 @@ CMD []
 
 
 # =============================================================================
-# STAGE: bot — node + supercronic; runs the scheduled digest (cron/run-digest.js)
+# STAGE: bot — node + claude-code + supercronic; runs scheduled scrapes via claude
 # =============================================================================
-FROM node:22-slim AS bot
+FROM node:20-slim AS bot
 
 ARG SUPERCRONIC_URL=https://github.com/aptible/supercronic/releases/latest/download/supercronic-linux-amd64
 ARG YQ_URL=https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
@@ -81,22 +81,23 @@ RUN curl -fsSL "$SUPERCRONIC_URL" -o /usr/local/bin/supercronic \
  && curl -fsSL "$YQ_URL" -o /usr/local/bin/yq \
  && chmod +x /usr/local/bin/yq
 
+RUN npm install -g @anthropic-ai/claude-code
+
 WORKDIR /workspace/scraper-bot
 
-# Dependencies before code, so a code-only change reuses the npm layer.
-COPY --chown=node:node cron/package.json cron/package-lock.json ./cron/
-RUN cd cron && npm ci --omit=dev --no-audit --no-fund
-
-COPY --chown=node:node config.yaml /workspace/config.yaml
-COPY --chown=node:node cron        ./cron
-COPY --chown=node:node prompts     ./prompts
+COPY --chown=node:node config.yaml            /workspace/config.yaml
+COPY --chown=node:node cron                   ./cron
+COPY --chown=node:node prompts                ./prompts
+COPY --chown=node:node claude/mcp.json.example ./.mcp.json
 
 RUN SCHEDULE="$(yq -r '.bot.schedule' /workspace/config.yaml)" \
  && echo "Generated cron schedule: $SCHEDULE" \
  && printf '%s /bin/sh /workspace/scraper-bot/cron/run-scraper.sh\n' "$SCHEDULE" \
     > cron/scraper-crontab \
  && chmod +x cron/entrypoint.sh cron/run-scraper.sh \
- && chown -R node:node /workspace
+ && mkdir -p /home/node/.claude \
+ && touch /home/node/.claude.json \
+ && chown -R node:node /home/node /workspace
 
 USER node
 

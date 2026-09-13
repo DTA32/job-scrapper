@@ -32,7 +32,7 @@ docker build -f Dockerfile.base        -t job-scraper-base .
 
 # 2. runtime images
 docker build -f Dockerfile.mcp         -t dta32/job-scraper-mcp:$TAG .
-docker build --target bot              -t dta32/job-scraper-bot:$TAG .   # root Dockerfile, node-only bot stage
+docker build -f Dockerfile.bot         -t dta32/job-scraper-bot:$TAG .
 # optional local-testing CLI image:
 # docker build -f Dockerfile.scraper-cli -t dta32/job-scraper-cli:$TAG .
 

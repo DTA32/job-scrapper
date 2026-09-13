@@ -10,7 +10,7 @@ itself.
 | Where | Scheduler | Defined in |
 |---|---|---|
 | docker compose (`--profile bot`) | supercronic inside the `bot` container; crontab generated from `config.yaml` `bot.schedule` at image build | `docker-compose.yml`, `Dockerfile` `bot` stage |
-| Kubernetes | CronJob `job-scraper-bot` runs `run-scraper.sh` directly (`schedule` + `timeZone` in the manifest, `concurrencyPolicy: Forbid`, `restartPolicy: OnFailure`) | `k8s/cronjob.yaml` |
+| Kubernetes | CronJob `job-scraper-bot` runs `run-scraper.sh` directly (`schedule` + `timeZone` in the manifest, `concurrencyPolicy: Forbid`, `restartPolicy: OnFailure`) | `k8s/cronjob.yaml`; image built from `Dockerfile.bot` |
 
 ## Architecture
 

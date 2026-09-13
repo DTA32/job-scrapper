@@ -10,6 +10,8 @@ and records the delivery on the run's **MongoDB** document.
 Four Dockerfile stages: `scraper-cli` (`python -m scraper`),
 `mcp-server` (`python -m mcp_server.server`), `bot`, plus `mongo` (MongoDB 7).
 Config-driven by `config.yaml` (keywords, sites, filters, bot schedule).
+The scheduled bot that runs on Kubernetes is built from `Dockerfile.bot` (Node.js
+only; see `k8s/README.md`), not from the root Dockerfile's `bot` stage.
 
 # How to run locally
 
