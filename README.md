@@ -138,12 +138,19 @@ Run after MongoDB is up:
 MONGO_HOST=127.0.0.1 MONGO_PORT=27018 ./seed.sh   # prod via SSH tunnel
 ```
 
-Seeds are idempotent — drop + recreate each run.
+Seeds are idempotent: `wilayah` is dropped and recreated, `requirement_samples` is upserted.
 
 **`wilayah`** — 91 599 Indonesian administrative region codes (Kepmendagri No 300.2.2-2138
 Tahun 2025). Source: [cahyadsn/wilayah](https://github.com/cahyadsn/wilayah/tree/6ff9b8a2764cd4fbeb8c15fe0cba2d5a4eb26107)
 ([wilayah.sql](https://raw.githubusercontent.com/cahyadsn/wilayah/6ff9b8a2764cd4fbeb8c15fe0cba2d5a4eb26107/db/wilayah.sql)).
 Runner: `seeds/wilayah.runner.js` (Node.js, requires `mongodb` package).
+
+**`requirement_samples`** — real job-description outlines for the bot's
+requirements extractor (see [The requirements block](#the-requirements-block)).
+`seed.sh` runs `seeds/requirement_samples.runner.js harvest`, which upserts from
+`scrape_runs` rather than dropping, so hand labels survive.
+`import <scraper output_dir> [--labels <file>]` adds outlines from a local scrape,
+and `--dry-run` previews either command.
 
 # SSH tunnel (reverse SOCKS proxy)
 
@@ -462,8 +469,8 @@ if the run document could not be patched.
 cd cron && npm ci && npm test
 ```
 
-`node --test` covers the template renderer, the requirements extractor (including
-35 hand-labelled real postings), the MCP client against a real SDK-built MCP server, a full `run-digest.js` run against a
+`node --test` covers the template renderer, the requirements extractor (plus, with
+`MONGO_URI` set, the hand-labelled real postings in MongoDB), the MCP client against a real SDK-built MCP server, a full `run-digest.js` run against a
 fake MCP server and a localhost webhook, and `send-digest.js`.
 
 **Calling MCP tools interactively** needs a `claude` CLI on your host (see
@@ -558,13 +565,16 @@ sentences from a Ringkasan), truncated at a word boundary with `…`, and render
 as `• item`. Caps: `REQ_MAX_ITEMS` (default 5) and `REQ_MAX_ITEM_CHARS`
 (default 80).
 
-`cron/fixtures/requirements/` holds 79 real scraped outlines, and `golden.json`
-labels 35 of them by hand (the heading, and how each bullet starts);
-`lib/requirements.golden.test.js` checks them on every `npm test`. When a real
-posting renders badly, add its outline as a fixture, label it, then change the
-rules. Regenerate the corpus with
-`python scripts/dump_requirement_fixtures.py <scraper output_dir>` (emails and
-phone numbers are redacted).
+Real postings to check the extractor against live in MongoDB, in the
+`requirement_samples` collection. `seeds/requirement_samples.runner.js harvest`
+copies every job outline out of `scrape_runs` (runs recorded with
+`run_metadata.requirements_format: "outline-v1"`; older runs hold truncated text
+and are skipped), so the corpus grows with each scheduled run. A sample with an
+`expected` field is labelled by hand (the heading, and how each bullet starts).
+`MONGO_URI=... npm run test:samples` checks every labelled sample and keeps all
+samples within the caps; without `MONGO_URI`, as in CI, that test is skipped.
+When a real posting renders badly, label its sample first (the runner's header
+has the mongosh one-liner), then change the rules.
 
 Every bot env var is listed in the header of `cron/run-digest.js` and in
 [docs/orchestration.md](docs/orchestration.md#bot-config-and-env).

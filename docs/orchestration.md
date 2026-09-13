@@ -51,7 +51,7 @@ request that stays silent until the scrape ends (see
 | `cron/send-digest.js` | uploads the digest to the webhook — splitting, retries, inline fallback; also a CLI (`DIGEST_PATH`, `DIGEST_SUMMARY`) |
 | `cron/*.test.js`, `cron/lib/*.test.js` | `node --test` suite (see [Tests](#tests)) |
 | `cron/test-support/` | fake SDK-built MCP server and localhost webhook stub used by the tests |
-| `cron/fixtures/requirements/` | 79 real scraped outlines from `scripts/dump_requirement_fixtures.py` (emails and phone numbers redacted), and `golden.json` labelling 35 of them |
+| `seeds/requirement_samples.runner.js` | builds MongoDB's `requirement_samples`: real outlines harvested from `scrape_runs`, some labelled by hand, read by the labelled extractor test |
 | `cron/entrypoint.sh` | `exec`s supercronic on the generated crontab |
 | `cron/scraper-crontab` | generated at image build from `config.yaml` `bot.schedule`; not in git |
 | `cron/package.json` | runtime deps `@modelcontextprotocol/sdk` and `undici`; Node ≥ 22 |
@@ -161,14 +161,31 @@ boundary with `…` and rendered as `• item`.
 | `REQ_MAX_ITEMS` | `5` | bullets per job |
 | `REQ_MAX_ITEM_CHARS` | `80` | characters per bullet |
 
-Quality is pinned by `cron/fixtures/requirements/golden.json`: real postings
-labelled by hand with the expected heading and how each bullet starts, checked
-by `lib/requirements.golden.test.js`. When a posting renders badly, save its
-outline as a fixture, label it first, then change the rules. To refresh the
-fixture outlines from a real scrape:
+Quality is pinned by real postings in MongoDB's `requirement_samples`
+collection. `scrape_jobs` records `run_metadata.requirements_format: "outline-v1"`
+on every run, and `seeds/requirement_samples.runner.js harvest` copies those runs'
+outlines into the collection: one sample per posting, first-seen date kept, text
+refreshed from the newest run. Runs from before the marker hold truncated or
+flattened text and are skipped. A sample with an `expected` field —
+`{heading, items}`, where each item is how that bullet starts — was labelled by
+hand. `lib/requirements.golden.test.js` checks every labelled sample and keeps all
+samples within the caps. It needs `MONGO_URI` and is skipped without it, so CI
+gates on the synthetic `lib/requirements.test.js` only. When a posting renders
+badly, label its sample first, then change the rules until the test passes.
 
 ```bash
-python scripts/dump_requirement_fixtures.py <scraper output_dir>   # → cron/fixtures/requirements/<site>-<id>.txt
+MONGO_URI=... node seeds/requirement_samples.runner.js harvest [--dry-run]
+MONGO_URI=... node seeds/requirement_samples.runner.js import <scraper output_dir> [--labels <file>] [--dry-run]
+cd cron && MONGO_URI=... npm run test:samples
+```
+
+Label a sample in mongosh. A labelled sample keeps the text it was labelled
+against: later harvests and unlabelled imports never rewrite it.
+
+```js
+db.requirement_samples.updateOne({ _id: "<id>" }, { $set: {
+  expected: { heading: "Kualifikasi", items: ["Minimal S1", "Pengalaman 2 tahun"] },
+  labelled_at: new Date().toISOString() } })
 ```
 
 ## Bot config and env
@@ -297,7 +314,7 @@ cd cron && npm ci && npm test
 
 `node --test` runs `lib/format.test.js` (template rules, dates, summary),
 `lib/requirements.test.js` (the extractor's rules), `lib/requirements.golden.test.js`
-(the extractor against hand-labelled real postings), `lib/mcp.test.js` (the client
+(the labelled postings in MongoDB; skipped without `MONGO_URI`), `lib/mcp.test.js` (the client
 against a real SDK-built MCP server that, like FastMCP, answers only when the
 tool returns), `run-digest.test.js` (a whole run against a fake MCP server and a
 localhost webhook) and `send-digest.test.js`. Python tests stay under `pytest`.

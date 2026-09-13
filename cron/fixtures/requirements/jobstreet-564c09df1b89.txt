@@ -1,1 +1,0 @@
-Membangun dan menjaga service backend Golang yang aman, teruji, observable, scalable, dan sesuai kontrak domain untuk membangun target-state greenfield dan memodernisasi platform operasi digital menuju arsitektur Project Reborn, dengan ownership desain dan delivery sub-system serta mentoring lintas squad.

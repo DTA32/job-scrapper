@@ -8,10 +8,14 @@
   },
   "scripts": {
     "digest": "node run-digest.js",
-    "test": "node --test"
+    "test": "node --test",
+    "test:samples": "node --test lib/requirements.golden.test.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.30.0",
     "undici": "7.29.1"
+  },
+  "devDependencies": {
+    "mongodb": "7.6.0"
   }
 }
