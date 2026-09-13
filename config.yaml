@@ -11,7 +11,10 @@ keywords:
   # - content writer
   # - seo
 
-limit: 3
+# New jobs posted per (keyword, site). Raised from 3 once formatting stopped going
+# through an LLM: over the 21 runs before, LinkedIn hit the old cap 96% of the time
+# with a median of 7 new in-scope jobs per keyword (p90 11).
+limit: 10
 concurrency: 2
 output_dir: output
 
@@ -25,7 +28,10 @@ output_dir: output
 #                   new-jobs search is cheap — set this higher.
 # A per-site `max_pages` under `sites:` overrides both.
 max_pages: 3
-api_max_pages: 10
+# limit x api_max_pages = a 50-job pool per API request. No keyword has had more than
+# 14 new in-scope jobs on one site in a 30-job pool, so a deeper pool would only add
+# raw_results bulk (~94% of every run document) without finding more new jobs.
+api_max_pages: 5
 page_delay_sec: 1.5
 
 # socks5://host:port or http://host:port — commented out for direct connection
@@ -67,12 +73,12 @@ default_fields:
 sites:
   jobstreet:
     enabled: true
-    limit: 3
+    limit: 10
     url_template: "https://id.jobstreet.com/id/{keyword_slug}-jobs?daterange=1&sortmode=ListedDate"
 
   glints:
     enabled: true
-    limit: 3
+    limit: 10
     url_template: "https://glints.com/id/opportunities/jobs/explore?keyword={keyword}&country=ID&sortBy=LATEST"
     fields:
       - title
@@ -89,7 +95,7 @@ sites:
 
   linkedin:
     enabled: true
-    limit: 3
+    limit: 10
     # guest API ignores sortBy=DD (verified); f_TPR is the real recency lever. Kept for convention.
     url_template: "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords={keyword}&location=Indonesia&f_TPR=r86400&sortBy=DD&start=0"
     fields:
@@ -103,5 +109,5 @@ sites:
 
   indeed:
     enabled: true
-    limit: 3
+    limit: 10
     url_template: "https://id.indeed.com/jobs?q={keyword_plus}&l=Indonesia&fromage=1"
