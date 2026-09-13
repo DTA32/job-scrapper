@@ -1,16 +1,13 @@
 #!/usr/bin/env node
 // Posts a run's job digest to a Discord webhook as a markdown attachment.
 //
-// The bot prompt (prompts/scrape-and-post.md) formats jobs into one markdown
-// file and hands the path here. This script owns everything after that: byte
-// accounting, splitting oversized digests, the multipart upload, rate-limit
-// retries, and the inline-message fallback when uploads keep failing.
+// run-digest.js formats jobs into one markdown file and calls sendDigest() with
+// its path. This module owns everything after that: byte accounting, splitting
+// oversized digests, the multipart upload, rate-limit retries, and the
+// inline-message fallback when uploads keep failing. It still runs as a CLI for
+// ad-hoc sends (the manage TUI's Discord smoke test uses it that way).
 //
-// It lives in code rather than in the prompt because all of it is arithmetic
-// the LLM would otherwise have to do by hand -- and because Step 6 writes the
-// resulting counts to MongoDB, where a recalled number is a wrong number.
-//
-// Env:
+// CLI env:
 //   DISCORD_WEBHOOK_URL  required, https://discord.com/api/webhooks/<id>/<token>
 //   DIGEST_PATH          required, path to the markdown digest
 //   DIGEST_SUMMARY       message body (title + summary, error diagnostic above
@@ -253,16 +250,19 @@ async function sendInline(webhookUrl, markdown, summary, maxChars) {
   return { sent, failed };
 }
 
-async function main() {
-  const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
-  const digestPath = process.env.DIGEST_PATH;
-  const summary = process.env.DIGEST_SUMMARY || '';
-
+/**
+ * Post the digest at `digestPath`, with `summary` as the visible message body.
+ * Resolves {mode, messages_sent, parts, bytes, failed}; throws only on bad input.
+ */
+async function sendDigest({
+  webhookUrl,
+  digestPath,
+  summary = '',
+  maxFileBytes = DEFAULT_MAX_FILE_BYTES,
+  maxChars = DEFAULT_MAX_CHARS,
+}) {
   if (!webhookUrl) throw new Error('DISCORD_WEBHOOK_URL is not set');
   if (!digestPath) throw new Error('DIGEST_PATH is not set');
-
-  const maxFileBytes = intFromEnv('MAX_FILE_BYTES', DEFAULT_MAX_FILE_BYTES);
-  const maxChars = intFromEnv('MAX_CHARS', DEFAULT_MAX_CHARS);
   // Clamp: a MAX_FILE_BYTES smaller than the multipart overhead would yield a
   // negative budget, and every job would be truncated to nothing.
   const budget = Math.max(maxFileBytes - MULTIPART_OVERHEAD, MIN_BUDGET_BYTES);
@@ -308,12 +308,20 @@ async function main() {
   if (attachmentParts === 0) mode = 'inline';
   else if (inlineParts > 0) mode = 'mixed';
 
-  // Step 6 of the prompt lifts these numbers straight into the Mongo patch.
-  console.log(
-    'RESULT ' +
-      JSON.stringify({ mode, messages_sent: sent, parts: parts.length, bytes, failed }),
-  );
-  process.exitCode = failed > 0 ? 1 : 0;
+  // run-digest.js copies these numbers into the run's Mongo document.
+  return { mode, messages_sent: sent, parts: parts.length, bytes, failed };
+}
+
+async function main() {
+  const result = await sendDigest({
+    webhookUrl: process.env.DISCORD_WEBHOOK_URL,
+    digestPath: process.env.DIGEST_PATH,
+    summary: process.env.DIGEST_SUMMARY || '',
+    maxFileBytes: intFromEnv('MAX_FILE_BYTES', DEFAULT_MAX_FILE_BYTES),
+    maxChars: intFromEnv('MAX_CHARS', DEFAULT_MAX_CHARS),
+  });
+  console.log('RESULT ' + JSON.stringify(result));
+  process.exitCode = result.failed > 0 ? 1 : 0;
 }
 
 if (require.main === module) {
@@ -324,4 +332,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { splitByBytes, splitByChars, truncateToBytes, JOB_SEPARATOR };
+module.exports = { sendDigest, splitByBytes, splitByChars, truncateToBytes, JOB_SEPARATOR };

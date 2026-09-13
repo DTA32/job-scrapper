@@ -13,7 +13,7 @@ const path = require('node:path');
 const { execFile } = require('node:child_process');
 
 const SCRIPT = path.join(__dirname, 'send-digest.js');
-const { splitByBytes, splitByChars, JOB_SEPARATOR } = require('./send-digest.js');
+const { sendDigest, splitByBytes, splitByChars, JOB_SEPARATOR } = require('./send-digest.js');
 
 /** Stub webhook. `responder(n)` returns {status, body} for the nth request. */
 function startStub(responder) {
@@ -203,6 +203,28 @@ test('persistent 500 falls back to inline messages under MAX_CHARS', async () =>
     assert.match(JSON.parse(inline[0].body).content, /Scraped 12 jobs\./);
   } finally {
     await new Promise((r) => server.close(r));
+  }
+});
+
+test('sendDigest resolves the delivery result in-process', async () => {
+  const stub = await startStub(() => ({ status: 200 }));
+  try {
+    const result = await sendDigest({
+      webhookUrl: stub.url,
+      digestPath: writeDigest(digestOf(2)),
+      summary: 'Scraped 2 jobs.',
+    });
+    assert.deepEqual(result, {
+      mode: 'attachment',
+      messages_sent: 1,
+      parts: 1,
+      bytes: Buffer.byteLength(digestOf(2), 'utf8'),
+      failed: 0,
+    });
+    assert.equal(stub.requests.length, 1);
+    await assert.rejects(sendDigest({ digestPath: 'unused.md' }), /DISCORD_WEBHOOK_URL is not set/);
+  } finally {
+    await stub.close();
   }
 });
 
