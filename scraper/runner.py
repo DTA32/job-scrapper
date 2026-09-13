@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import re
 import time
 from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -62,28 +61,19 @@ def _within_max_age(job: Job, cutoff: datetime | None) -> bool:
     return parsed >= cutoff
 
 
-# Descriptions open with company boilerplate ("About <Company>…"); the
-# candidate-facing section the bot actually renders starts well into the text
-# (median 642 chars over a 29-job sample). Anchor the kept window there, or a
-# small cap keeps only the blurb and drops the qualifications entirely.
-_REQUIREMENTS_ANCHOR = re.compile(
-    r"(requirements?|qualifications?|what we'?re looking for|we need"
-    r"|kualifikasi|persyaratan)",
-    re.IGNORECASE,
-)
+def _cap_requirements(text: object, max_chars: int | None) -> str | None:
+    """Apply the optional `requirements_max_chars` cap to a description outline.
 
-
-def _truncate_requirements(text: object, max_chars: int | None) -> str | None:
-    """Cap a raw description. The bot renders only a few bullets from this, so the
-    untruncated text is pure payload weight on every run."""
-    if not isinstance(text, str):
+    The bot extracts its bullets from the whole outline, so the cap only bounds the
+    run document. It cuts at the last line break inside the budget, so no heading or
+    list item is split, and marks the cut with a trailing `…` line."""
+    if not isinstance(text, str) or not text.strip():
         return None
     if max_chars is None or len(text) <= max_chars:
         return text
-    match = _REQUIREMENTS_ANCHOR.search(text)
-    start = match.start() if match else 0
-    window = text[start : start + max_chars].rstrip()
-    return f"{'…' if start else ''}{window}{'…' if start + max_chars < len(text) else ''}"
+    cut = text.rfind("\n", 0, max_chars + 1)
+    head = text[:cut] if cut > 0 else text[:max_chars]
+    return f"{head.rstrip()}\n…"
 
 
 def _fetch_requirements(
@@ -118,7 +108,7 @@ def _fetch_requirements(
         for fut in as_completed(futures):
             idx = futures[fut]
             try:
-                jobs[idx]["requirements"] = _truncate_requirements(fut.result(), max_chars)
+                jobs[idx]["requirements"] = _cap_requirements(fut.result(), max_chars)
             except Exception:
                 jobs[idx]["requirements"] = None
 

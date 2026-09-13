@@ -7,6 +7,7 @@ from bs4 import BeautifulSoup
 from ..types import Job, empty_job
 from ._api import request_json
 from ._next_data import extract_next_data, walk_dicts
+from ._text import html_to_outline
 from .base import Scraper
 
 # JobStreet/SEEK's public v5 JobSearch REST API (no auth). The older chalice-search
@@ -201,7 +202,7 @@ class JobstreetScraper(Scraper):
                 for key in ("requirements", "jobDescription", "description"):
                     value = candidate.get(key)
                     if isinstance(value, str) and value.strip():
-                        return value.strip()
+                        return html_to_outline(value)
         soup = BeautifulSoup(html, "lxml")
         for selector in (
             "[data-automation='jobAdDetails']",
@@ -210,7 +211,7 @@ class JobstreetScraper(Scraper):
         ):
             el = soup.select_one(selector)
             if el:
-                text = el.get_text("\n", strip=True)
+                text = html_to_outline(el.decode_contents())
                 if text:
                     return text
         return None

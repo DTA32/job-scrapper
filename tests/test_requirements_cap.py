@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from scraper.config_loader import load
-from scraper.runner import _truncate_requirements
+from scraper.runner import _cap_requirements
 
 _CONFIG = """
 keywords: [software engineer]
@@ -30,44 +30,23 @@ def test_cap_defaults_to_none(tmp_path: Path):
 
 
 def test_short_text_is_untouched():
-    assert _truncate_requirements("short", 40) == "short"
+    assert _cap_requirements("## Requirements\n- Python", 40) == "## Requirements\n- Python"
 
 
-def test_long_text_is_truncated_with_ellipsis():
-    out = _truncate_requirements("x" * 100, 40)
-    assert out is not None
-    assert out.endswith("…")
-    assert len(out) == 41  # 40 chars + the ellipsis
+def test_cut_lands_on_a_line_boundary():
+    text = "## Requirements\n- Python\n- Three years of production SQL experience"
+    assert _cap_requirements(text, 30) == "## Requirements\n- Python\n…"
 
 
-def test_window_anchors_on_qualification_heading():
-    # boilerplate long enough that a head-only cut would lose the heading entirely
-    text = "About ACME. " * 40 + "Requirements: Python, 3 years experience." + " tail" * 50
-    out = _truncate_requirements(text, 60)
-    assert out is not None
-    assert out.startswith("…Requirements:")
-    assert "Python" in out
-
-
-def test_window_falls_back_to_head_when_no_heading():
-    text = "About ACME. " * 40
-    out = _truncate_requirements(text, 60)
-    assert out is not None
-    assert not out.startswith("…")
-    assert out.startswith("About ACME.")
-
-
-def test_indonesian_heading_is_recognized():
-    text = "Tentang perusahaan. " * 30 + "Kualifikasi: S1 Teknik Informatika." + " x" * 60
-    out = _truncate_requirements(text, 60)
-    assert out is not None
-    assert out.startswith("…Kualifikasi:")
+def test_single_long_line_is_hard_cut():
+    assert _cap_requirements("x" * 100, 40) == "x" * 40 + "\n…"
 
 
 def test_no_cap_means_no_truncation():
-    assert _truncate_requirements("x" * 5000, None) == "x" * 5000
+    assert _cap_requirements("x" * 5000, None) == "x" * 5000
 
 
-def test_non_string_becomes_none():
-    assert _truncate_requirements(None, 40) is None
-    assert _truncate_requirements(123, 40) is None
+def test_blank_or_non_string_becomes_none():
+    assert _cap_requirements(None, 40) is None
+    assert _cap_requirements(123, 40) is None
+    assert _cap_requirements("  \n ", 40) is None

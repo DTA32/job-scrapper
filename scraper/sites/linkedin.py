@@ -6,6 +6,7 @@ from bs4 import BeautifulSoup
 
 from ..types import Job, empty_job
 from ._pagination import with_query_param
+from ._text import html_to_outline
 from .base import Scraper
 
 _JOB_ID_RE = re.compile(r"/jobs/view/[^/]*?-?(\d{6,})(?:/|\?|$)")
@@ -39,7 +40,7 @@ class LinkedinScraper(Scraper):
         ):
             el = soup.select_one(selector)
             if el:
-                text = el.get_text("\n", strip=True)
+                text = html_to_outline(el.decode_contents())
                 if text:
                     return text
         return None

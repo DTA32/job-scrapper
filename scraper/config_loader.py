@@ -387,8 +387,8 @@ def load(path: Path) -> AppConfig:
     if page_delay_sec < 0:
         raise ConfigError(f"'page_delay_sec' must be >= 0, got {page_delay_sec}")
 
-    # Raw descriptions run to several thousand chars each and dominate the payload
-    # handed to the bot, which only renders a few bullets from them. Cap server-side.
+    # Optional hard cap on the `requirements` outline. The bot extracts its bullets
+    # from the full text, so this only bounds run-document size; null = no cap.
     requirements_max_chars: int | None = None
     req_max_raw = raw.get("requirements_max_chars")
     if req_max_raw is not None:

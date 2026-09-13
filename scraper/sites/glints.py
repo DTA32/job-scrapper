@@ -9,6 +9,7 @@ from bs4 import BeautifulSoup
 from ..types import Job, empty_job
 from ._api import request_json
 from ._next_data import extract_next_data, walk_dicts
+from ._text import html_to_outline
 from .base import Scraper
 
 # Glints' public GraphQL endpoint (v2-alc) powering the job-search page. No auth,
@@ -171,7 +172,7 @@ def _description_from_jsonld(html: str) -> str | None:
                 continue
             description = entry.get("description")
             if isinstance(description, str) and description.strip():
-                return BeautifulSoup(description, "lxml").get_text("\n", strip=True)
+                return html_to_outline(description)
     return None
 
 
@@ -339,12 +340,12 @@ class GlintsScraper(Scraper):
                 for key in ("description", "requirements", "jobDescription"):
                     value = candidate.get(key)
                     if isinstance(value, str) and value.strip():
-                        return value.strip()
+                        return html_to_outline(value)
         soup = BeautifulSoup(html, "lxml")
         for selector in (".JobDescription", "[class*='description']", ".job-description"):
             el = soup.select_one(selector)
             if el:
-                text = el.get_text("\n", strip=True)
+                text = html_to_outline(el.decode_contents())
                 if text:
                     return text
         return None

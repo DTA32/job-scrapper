@@ -351,11 +351,19 @@ def get_scrape_response_structure() -> dict[str, Any]:
     sample_job["title"] = "Data Analyst"
     sample_job["company"] = "ACME"
     sample_job["url"] = "https://id.jobstreet.com/job/123"
+    sample_job["requirements"] = "## Requirements\n- 2+ years of Python\n- Familiar with SQL"
 
     return {
         "tool": "scrape_jobs",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "job_fields": list(JOB_FIELD_ORDER),
+        "field_formats": {
+            "requirements": (
+                "Outline text from the job description: '## ' opens a heading line, "
+                "'- ' opens a list item, a blank line separates paragraphs. Null when "
+                "no description was found; capped at requirements_max_chars when set."
+            ),
+        },
         "top_level_fields": [
             "ok",
             "keywords",
@@ -673,7 +681,8 @@ def scrape_jobs(
                 fields: site, matched_keyword, title, company, url, location,
                 salary, posted_date, posted_at, work_type, employment_type,
                 experience_level, job_id, requirements. Fields a site cannot
-                extract are returned as null.
+                extract are returned as null. `requirements` is outline text:
+                '## ' heading lines, '- ' list items, blank lines between paragraphs.
             errors: list of {keyword, site, reason, attempts?} for any pair
                 that failed. Presence of entries here means ok=false.
                 `attempts` (when present) lists per-fetcher outcomes:

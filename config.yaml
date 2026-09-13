@@ -34,8 +34,8 @@ page_delay_sec: 1.5
 
 bot:
   # Informational only — the k8s CronJob (k8s/cronjob.yaml) is the source of truth
-  # for the schedule. MAX_CHARS is now an env var and the Discord message template
-  # lives in docs/response_template.md.
+  # for the schedule. MAX_CHARS is an env var and the per-job Discord template
+  # lives in prompts/response_template.md.
   schedule: "0 11 * * *"
 
 # jobs older than this are dropped; pair with URL param windows per site
@@ -46,9 +46,10 @@ filter:
   # employment_type: [full-time, internship, contract, part-time]
   # work_type: [remote, hybrid, onsite]
 
-# Raw job descriptions run to ~2.5k chars each (9k observed) and are ~80% of the
-# payload handed to the bot, which only renders a few bullets. Cap them server-side.
-requirements_max_chars: 600
+# Optional hard cap on the `requirements` outline, cut at a line boundary. The bot
+# extracts its bullets deterministically from the full text, so leave this null
+# unless run documents in Mongo need bounding.
+requirements_max_chars: ~
 
 # anchors (site, matched_keyword, title, company, url) always included
 default_fields:
