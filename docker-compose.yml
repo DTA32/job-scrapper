@@ -81,7 +81,7 @@ services:
       - MONGO_DB_NAME=${MONGO_DB_NAME:-job_scraper}
       - MONGO_COLLECTION_NAME=${MONGO_COLLECTION_NAME:-scrape_runs}
 
-  # SERVICE: bot — cron bot; runs claude-code on a schedule; profile-gated so `docker compose up` skips it by default
+  # SERVICE: bot — cron bot; runs the digest pipeline (cron/run-digest.js) on a schedule; profile-gated so `docker compose up` skips it by default
   bot:
     build:
       context: .
@@ -98,12 +98,12 @@ services:
         condition: service_completed_successfully
     environment:
       - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
+      - MCP_URL=${MCP_URL:-http://host.docker.internal:8080/mcp}
       - MAX_CHARS=${MAX_CHARS:-1900}
+      - REQ_MAX_ITEMS=${REQ_MAX_ITEMS:-5}
+      - REQ_MAX_ITEM_CHARS=${REQ_MAX_ITEM_CHARS:-80}
       - TZ=${TZ:-Asia/Jakarta}
-      - BOT_MODEL=${BOT_MODEL:-}
     volumes:
-      - ${CLAUDE_CONFIG_DIR:-~/.claude}:/home/node/.claude
-      - ${CLAUDE_CONFIG_FILE:-~/.claude.json}:/home/node/.claude.json
       - ./output:/workspace/output
 
 volumes:

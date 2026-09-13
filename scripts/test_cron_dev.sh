@@ -9,8 +9,6 @@ set -euo pipefail
 # Requires:
 #   .env                - must contain DISCORD_WEBHOOK_URL,
 #                         MONGO_ROOT_PASSWORD (sourced automatically by this script)
-#   ~/.claude           - your local Claude Code session config dir
-#   ~/.claude.json      - your local Claude Code config file
 #   yq                  - https://github.com/mikefarah/yq
 #
 # Usage:
@@ -43,20 +41,7 @@ set -a
 source "$REPO_ROOT/.env"
 set +a
 
-CLAUDE_CONFIG_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
-CLAUDE_CONFIG_FILE="${CLAUDE_CONFIG_FILE:-$HOME/.claude.json}"
-
 : "${DISCORD_WEBHOOK_URL:?set DISCORD_WEBHOOK_URL before running}"
-
-if [ ! -d "$CLAUDE_CONFIG_DIR" ]; then
-  echo "ERROR: Claude config dir not found at $CLAUDE_CONFIG_DIR" >&2
-  echo "Run 'claude login' first, or set CLAUDE_CONFIG_DIR" >&2
-  exit 1
-fi
-if [ ! -f "$CLAUDE_CONFIG_FILE" ]; then
-  echo "ERROR: Claude config file not found at $CLAUDE_CONFIG_FILE" >&2
-  exit 1
-fi
 
 # --- validate dev stack state ---
 # Use `docker ps -a` (all statuses) so containers in Restarting/Exited state

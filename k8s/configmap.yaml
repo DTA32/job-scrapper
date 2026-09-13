@@ -3,14 +3,16 @@ kind: ConfigMap
 metadata:
   name: job-scraper-config
 data:
-  # Model the bot's claude CLI runs the digest prompt with (consumed by
-  # cron/run-scraper.sh). Must be served by whatever endpoint the
-  # claude-config PVC points the CLI at.
-  BOT_MODEL: "qwen3.8-max"
+  # job-scraper MCP endpoint the bot's digest run calls (cron/run-digest.js).
+  MCP_URL: "http://job-scraper-mcp-service/mcp"
+  # Cap on the scrape_jobs call. The MCP server sends nothing until the scrape
+  # finishes, so this is the only timeout on it.
+  SCRAPE_TIMEOUT_MS: "1800000"
   MONGO_DB_NAME: "job-scraper"
   MONGO_COLLECTION_NAME: "scrape_runs"
   MONGO_SERVER_SELECTION_TIMEOUT_MS: "3000"
   TZ: "Asia/Jakarta"
   MAX_CHARS: "1900"
-  CLAUDE_CONFIG_DIR: "/claude-config/.claude"
-  CLAUDE_CONFIG_FILE: "/claude-config/.claude.json"
+  # Requirements bullets rendered per job, and the length cap per bullet.
+  REQ_MAX_ITEMS: "5"
+  REQ_MAX_ITEM_CHARS: "80"

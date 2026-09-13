@@ -1,55 +1,30 @@
 #!/bin/sh
-# Cron entrypoint: runs claude-code with a markdown prompt, logs all output.
+# Cron entrypoint: runs one digest (scrape via MCP -> Discord -> Mongo) and logs all output.
 # POSIX sh (not bash): supercronic/docker invoke this as `/bin/sh run-scraper.sh`,
 # and the bot image's /bin/sh is dash — so no bashisms (e.g. ${PIPESTATUS}).
+#
+# All configuration is environment (MCP_URL, DISCORD_WEBHOOK_URL, SCRAPE_TIMEOUT_MS,
+# REQ_MAX_ITEMS, ...), injected by the k8s ConfigMap/Secret or docker-compose. The
+# header of cron/run-digest.js lists every variable.
 LOG=/workspace/scraper-bot/cron/scraper.log
-PROMPT=/workspace/scraper-bot/prompts/scrape-and-post.md
-MCP_CONFIG=/workspace/scraper-bot/.mcp.json
-# BOT_MODEL (env): model name passed to `claude --model`. Injected via the k8s
-#   ConfigMap (k8s/configmap.yaml -> envFrom) or via .env for docker-compose.
-#   Falls back to claude-sonnet-5 when unset/empty, so runs without it keep
-#   today's behavior. Which endpoint serves that model is decided by the
-#   claude-config PVC (CLAUDE_CONFIG_DIR/FILE), not here. Resolved below and
-#   re-exported so the prompt can quote it in the Discord summary line
-#   ("using {bot_model}").
-BOT_MODEL="${BOT_MODEL:-claude-sonnet-5}"
-export BOT_MODEL
+DIGEST=/workspace/scraper-bot/cron/run-digest.js
 
 echo "[$(date)] starting multi-site scraper run..." | tee -a "$LOG"
 cd /workspace/scraper-bot
-# --mcp-config: load the job-scraper MCP server explicitly. The image also bakes
-#   this file in as a project-scoped .mcp.json, but project-scoped servers need a
-#   trust approval recorded per project path in CLAUDE_CONFIG_FILE — and that file
-#   is seeded from a `claude login` on another machine, so the approval for
-#   /workspace/scraper-bot is not in it. Passing the config explicitly sidesteps
-#   the trust flow; without it the MCP tools can go missing and the run fails at
-#   Step 1 with nothing posted.
-# --strict-mcp-config: use ONLY the server above, so nothing inherited from the
-#   PV-backed config can shadow or interfere with it.
-# --dangerously-skip-permissions: needed for unattended cron — no TTY to approve
-#   prompts. Covers tool permission checks, not MCP project trust.
-# --verbose --output-format stream-json: emit one JSON event per step (tool calls,
-#   assistant messages, result) so the run's internals stream live to the log.
-#   Default text mode buffers and prints only the final result at the very end;
-#   --verbose alone does not stream. --verbose is required for stream-json.
-# Stream claude output to console + log, but capture *claude's* exit (not tee's).
+# Stream the run's output to console + log, but capture *node's* exit (not tee's).
 # POSIX sh has no ${PIPESTATUS}, so route the real rc through a file.
 {
-  claude \
-    --model "$BOT_MODEL" \
-    --mcp-config "$MCP_CONFIG" \
-    --strict-mcp-config \
-    --dangerously-skip-permissions \
-    --verbose \
-    --output-format stream-json \
-    -p "$(cat "$PROMPT")" \
-    2>&1
+  node "$DIGEST" 2>&1
   echo "$?" >"$LOG.rc"
 } | tee -a "$LOG"
 EXIT_CODE="$(cat "$LOG.rc")"; rm -f "$LOG.rc"
 
 if [ "$EXIT_CODE" -ne 0 ]; then
-  echo "[$(date)] ERROR: claude exited with code $EXIT_CODE" | tee -a "$LOG" >&2
+  echo "[$(date)] ERROR: digest run exited with code $EXIT_CODE" | tee -a "$LOG" >&2
 fi
 
 echo "[$(date)] run complete." | tee -a "$LOG"
+# Exit 0 even when the run failed, as the claude-based entrypoint did: the CronJob
+# restarts on failure, and a retry would scrape again after this run's jobs were
+# already marked seen (and possibly posted). The ERROR line above is the signal.
+exit 0

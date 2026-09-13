@@ -18,3 +18,8 @@ Dockerfile
 .dockerignore
 README.md
 docs
+node_modules
+cron/node_modules
+cron/fixtures
+cron/test-support
+**/*.test.js

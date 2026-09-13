@@ -7,8 +7,6 @@ set -euo pipefail
 # Requires:
 #
 #   DISCORD_WEBHOOK_URL - Discord webhook URL to post into
-#   ~/.claude           - your local Claude Code session config dir
-#   ~/.claude.json      - your local Claude Code config file
 #
 # Usage:
 #   export DISCORD_WEBHOOK_URL=...
@@ -28,16 +26,6 @@ fi
 
 if ! command -v yq &>/dev/null; then
   echo "ERROR: yq not found — install it first: https://github.com/mikefarah/yq" >&2
-  exit 1
-fi
-
-if [ ! -d "$HOME/.claude" ]; then
-  echo "Claude config dir not found at $HOME/.claude" >&2
-  echo "Run 'claude login' first" >&2
-  exit 1
-fi
-if [ ! -f "$HOME/.claude.json" ]; then
-  echo "Claude config file not found at $HOME/.claude.json" >&2
   exit 1
 fi
 

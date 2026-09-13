@@ -180,7 +180,7 @@ def build_test(test: str) -> list[Command]:
         return [Command(["docker", "exec", _MCP_CONTAINER, "python", "-c", _MONGO_PING_SCRIPT])]
     if test == "cron":
         # Same one-shot as scripts/test_cron_dev.sh: fires the full cron job
-        # (claude scrape + real Discord posts) once inside the bot container.
+        # (real scrape + real Discord posts) once inside the bot container.
         return [
             Command(
                 [

@@ -9,10 +9,9 @@ cluster. This replaces the docker-compose + supercronic setup.
 |----------|----------|---------|
 | `deployment.yaml` | Deployment `job-scraper-mcp` | Long-running MCP HTTP server (port 8080) |
 | `service.yaml` | Service `job-scraper-mcp-service` | ClusterIP so the bot reaches the MCP in-cluster |
-| `cronjob.yaml` | CronJob `job-scraper-bot` | Daily scrape+post via claude-code (replaces supercronic) |
-| `configmap.yaml` | ConfigMap `job-scraper-config` | Non-secret env (BOT_MODEL, DB name, TZ, MAX_CHARS, CLAUDE_CONFIG_*) |
+| `cronjob.yaml` | CronJob `job-scraper-bot` | Daily digest: `cron/run-digest.js` scrapes via the MCP service, posts to Discord, records the run |
+| `configmap.yaml` | ConfigMap `job-scraper-config` | Non-secret env (MCP_URL, SCRAPE_TIMEOUT_MS, DB name, TZ, MAX_CHARS, REQ_MAX_ITEMS, REQ_MAX_ITEM_CHARS) |
 | `secret.example.yaml` | Secret `job-scraper-secret` | Template for `MONGO_URI` (Atlas) + `DISCORD_WEBHOOK_URL`; copy to `secret.yaml` (gitignored) |
-| `pv.yaml` / `pvc.yaml` | PV/PVC `job-scraper-claude-*` | hostPath volume holding the Claude Code session auth |
 
 MongoDB is **MongoDB Atlas (cloud)** — there is no Mongo manifest. The MCP server
 reaches job sites and Atlas directly from the homeserver's residential IP; no
@@ -33,7 +32,7 @@ docker build -f Dockerfile.base        -t job-scraper-base .
 
 # 2. runtime images
 docker build -f Dockerfile.mcp         -t dta32/job-scraper-mcp:$TAG .
-docker build -f Dockerfile.bot         -t dta32/job-scraper-bot:$TAG .
+docker build --target bot              -t dta32/job-scraper-bot:$TAG .   # root Dockerfile, node-only bot stage
 # optional local-testing CLI image:
 # docker build -f Dockerfile.scraper-cli -t dta32/job-scraper-cli:$TAG .
 
@@ -43,17 +42,7 @@ docker push dta32/job-scraper-bot:$TAG
 
 ## One-time host / cluster setup
 
-1. **Claude Code session auth** (PVC-backed). On the node:
-   ```sh
-   sudo mkdir -p /mnt/data/job-scraper-claude
-   claude login                                   # once, as a user with a session
-   sudo cp -r ~/.claude      /mnt/data/job-scraper-claude/.claude
-   sudo cp    ~/.claude.json /mnt/data/job-scraper-claude/.claude.json
-   ```
-   The CronJob mounts this at `/claude-config`; `CLAUDE_CONFIG_DIR` /
-   `CLAUDE_CONFIG_FILE` (from the ConfigMap) point into it.
-
-2. **Secret.** Copy the template, fill in real values, then apply it:
+1. **Secret.** Copy the template, fill in real values, then apply it:
    ```sh
    cp secret.example.yaml secret.yaml
    # edit secret.yaml: MONGO_URI, DISCORD_WEBHOOK_URL
@@ -61,7 +50,7 @@ docker push dta32/job-scraper-bot:$TAG
    `secret.yaml` is gitignored, so real credentials cannot be committed; only
    `secret.example.yaml` (placeholders) is tracked.
 
-3. **Seed the `wilayah` collection into Atlas** (optional; improves the location
+2. **Seed the `wilayah` collection into Atlas** (optional; improves the location
    filter — the scraper degrades to substring matching without it):
    ```sh
    MONGO_URI="mongodb+srv://<user>:<pass>@<cluster>.mongodb.net/?retryWrites=true&w=majority" \
@@ -77,8 +66,6 @@ sed -i.bak "s#replacedbycicd#dta32/job-scraper-bot:$TAG#" cronjob.yaml
 
 kubectl apply -f secret.yaml \
               -f configmap.yaml \
-              -f pv.yaml \
-              -f pvc.yaml \
               -f deployment.yaml \
               -f service.yaml \
               -f cronjob.yaml
@@ -111,6 +98,10 @@ curl -s localhost:8080/health
 - **Schedule.** `cronjob.yaml` (`schedule: "0 11 * * *"`, `timeZone:
   "Asia/Jakarta"`) is the source of truth. `config.yaml`'s `bot.schedule` is now
   informational only.
+- **Upgrading from the claude-code bot.** The bot no longer mounts a Claude session.
+  Once a run on the new image has posted, remove what the old one needed:
+  `kubectl delete pvc job-scraper-claude-pvc && kubectl delete pv job-scraper-claude-pv`,
+  then wipe `/mnt/data/job-scraper-claude` on the node, which holds a logged-in session.
 - **Dedup.** Cross-run deduplication is handled server-side by the MCP
   `scrape_jobs` tool (Mongo `seen_jobs` collection); the bot just posts what it
   is given. Tune `max_pages` / `page_delay_sec` in `config.yaml`.
