@@ -16,7 +16,7 @@ images at build time; secrets injected via `docker run -e`.
 | Image | Container | Role |
 |---|---|---|
 | `ghcr.io/<owner>/<repo>:mcp-<sha>` | `scraper-mcp` | FastMCP HTTP server on port 8080 |
-| `ghcr.io/<owner>/<repo>:bot-<sha>` | `scraper-bot` | supercronic + Claude Code CLI; fires the prompt on schedule and posts to Discord |
+| `ghcr.io/<owner>/<repo>:bot-<sha>` | `scraper-bot` | supercronic + Node.js digest pipeline (`cron/run-digest.js`); scrapes via MCP on schedule and posts to Discord |
 
 Both also tagged as `:mcp-latest` / `:bot-latest`.
 
@@ -44,38 +44,12 @@ Repo → Settings → Secrets and variables → Actions → **Secrets** tab.
 
 `GITHUB_TOKEN` is auto-provided — used to push to ghcr.io.
 
-## Required GitHub variables
+## GitHub variables
 
-Same UI, but the **Variables** tab. Plain text (visible in logs and to
-anyone with read access). Use these for non-secret config:
-
-| Variable | Used by | Value |
-|---|---|---|
-| `CLAUDE_CONFIG_DIR` | deploy-bot | `/home/ubuntu/.claude` (host path mounted into bot for Claude session auth) |
-| `CLAUDE_CONFIG_FILE` | deploy-bot | `/home/ubuntu/.claude.json` (host file mounted into bot) |
-
-## Claude Code authentication
-
-The bot uses **session-based auth** from your existing Claude Code login —
-not an API key. The `deploy-bot` job mounts these from the VPS host:
-
-| Host path | Container path |
-|---|---|
-| `/home/ubuntu/.claude` | `/home/node/.claude` |
-| `/home/ubuntu/.claude.json` | `/home/node/.claude.json` |
-
-These contain the auth session created when you ran `claude login` on
-the VPS. The bot inherits that session — same Claude account, same
-config, no API key required.
-
-Both paths are pulled from GitHub repo variables `CLAUDE_CONFIG_DIR` and
-`CLAUDE_CONFIG_FILE` (see "Required GitHub variables" above). Update
-those values in repo settings if your `.claude` config lives elsewhere
-on the VPS — no code change needed.
-
-If those files don't exist on the VPS, the bot will start but `claude`
-calls will fail. Run `claude login` once on the VPS as the `ubuntu`
-user before the first deploy.
+None are required. Same UI, **Variables** tab (plain text, visible in
+logs): the workflow reads `MONGO_ROOT_USER`, `MONGO_DB_NAME` and
+`MONGO_COLLECTION_NAME` in deploy-mcp and `TZ` in deploy-bot, each with a
+default. The bot needs no model credentials and no host mounts.
 
 ## Hardcoded values (workflow env block)
 
@@ -88,10 +62,13 @@ Edit `.github/workflows/deploy.yml` if you want different container names.
 
 ## Networking
 
-scraper-bot reaches scraper-mcp via `host.docker.internal:8080` — the
-`--add-host=host.docker.internal:host-gateway` flag in the bot's
-`docker run` exposes the VPS host as a resolvable name from inside the
-bot container. The bot's baked-in `.mcp.json` points at this URL.
+scraper-bot reaches scraper-mcp at `MCP_URL` (read by
+`cron/run-digest.js` each run). Under compose it defaults to
+`http://host.docker.internal:8080/mcp`; the
+`host.docker.internal:host-gateway` host entry (`extra_hosts` in compose,
+`--add-host` with `docker run`) exposes the VPS host as a resolvable name
+from inside the bot container. On Kubernetes, `k8s/configmap.yaml` sets it
+to `http://job-scraper-mcp-service/mcp`.
 
 scraper-mcp listens on the host's port 8080 directly, so anything else
 on the VPS (or off it, with firewall rules) can also reach it via that
@@ -121,17 +98,17 @@ Because everything is baked in:
 |---|---|
 | Change `keyword`, `limit`, `filter` | Edit `config.yaml` → push to `main` |
 | Change cron schedule | Edit `bot.schedule` in `config.yaml` → push to `main` (bot Dockerfile reads it via `yq` at build time) |
-| Change Discord message format | Edit `bot.message_template` in `config.yaml` → push to `main` (read fresh each run, no rebuild needed) |
+| Change Discord message format | Edit `prompts/response_template.md` → push to `main`. Read each run, but baked into the bot image, so it changes only with the rebuild/deploy |
+| Change requirements bullets | Edit `REQ_MAX_ITEMS` (default 5 bullets per job) / `REQ_MAX_ITEM_CHARS` (default 80 chars per bullet) in `k8s/configmap.yaml` → next run (or `.env`, then recreate the compose bot); no rebuild |
 | Change Discord per-message cap | Edit `MAX_CHARS` in `k8s/configmap.yaml` (or `.env`) → affects only the inline fallback; the normal path posts one attachment |
-| Change the bot model | Edit `BOT_MODEL` in `k8s/configmap.yaml` (or `.env` for compose) → picked up on the next pod run; no image rebuild needed. The model must be served by the endpoint the claude-config PVC points the CLI at |
 | Change the Discord upload cap | Set `MAX_FILE_BYTES` (default 10 MiB, Discord's non-boosted limit; raise to 50/100 MiB on a boosted guild) |
+| Change the MCP endpoint | Edit `MCP_URL` in `k8s/configmap.yaml` (or `.env`; compose defaults it to `http://host.docker.internal:8080/mcp`) → next run |
+| Change the scrape timeout | Edit `SCRAPE_TIMEOUT_MS` in `k8s/configmap.yaml` (default 1800000 = 30 min) → next run. It is the only cap on the `scrape_jobs` call |
 | Change Discord channel | Update `DISCORD_CHANNEL_ID` GitHub secret → push to main (or manual deploy) |
-| Change bot prompt | Edit `prompts/scrape-and-post.md` → push to `main` |
 | Rotate Discord bot token | Update `DISCORD_BOT_TOKEN` secret → push to main |
-| Rotate Claude session | Re-run `claude login` on the VPS as `ubuntu` user — bot picks it up on next start |
 
 Note: `update_config` MCP tool writes are still **ephemeral** — useful
-for one-shot experiments via Claude session, but lost on next deploy.
+for one-shot experiments from an interactive Claude session, but lost on next deploy.
 For permanent changes, edit the repo file.
 
 ## Manual rollback
@@ -150,17 +127,19 @@ docker stop scraper-mcp && docker rm scraper-mcp
 docker run -d --name scraper-mcp --restart unless-stopped -p 8080:8080 \
   ghcr.io/orangemangodimz/job-scrapper:mcp-<previous-sha>
 
-# Bot rollback (need to re-supply env vars + .claude mounts)
+# Bot rollback (need to re-supply the bot env)
 docker pull ghcr.io/orangemangodimz/job-scrapper:bot-<previous-sha>
 docker stop scraper-bot && docker rm scraper-bot
 docker run -d --name scraper-bot --restart unless-stopped \
   --add-host=host.docker.internal:host-gateway \
-  -v /home/ubuntu/.claude:/home/node/.claude \
-  -v /home/ubuntu/.claude.json:/home/node/.claude.json \
-  -e DISCORD_BOT_TOKEN=... \
-  -e DISCORD_CHANNEL_ID=... \
+  -e DISCORD_WEBHOOK_URL=... \
+  -e MCP_URL=http://host.docker.internal:8080/mcp \
+  -e TZ=Asia/Jakarta \
   ghcr.io/orangemangodimz/job-scrapper:bot-<previous-sha>
 ```
+
+A bot image from before the Node.js pipeline still runs the claude-code CLI
+and needs the Claude session mounts it was deployed with.
 
 ## Trigger flow
 
@@ -184,36 +163,47 @@ docker build --target bot -t job-scraper-bot:local .
 
 If both boot, the same Dockerfile targets will build in CI.
 
-### End-to-end test (skip cron, fire one-shot)
-
-`scripts/test-locally.sh` builds both images, starts the MCP server,
-and fires the bot's `run-scraper.sh` once — same code path supercronic
-would trigger, but synchronous and immediate.
+The bot's unit tests need only Node 22+:
 
 ```bash
-export DISCORD_BOT_TOKEN=<your bot token>
-export DISCORD_CHANNEL_ID=<test channel id>
+cd cron && npm ci && npm test
+```
+
+### End-to-end test (skip cron, fire one-shot)
+
+`scripts/test-locally.sh` starts the compose `mcp` profile (mongo +
+scraper-mcp) and fires the bot's `run-scraper.sh` once — same code path
+supercronic would trigger, but synchronous and immediate.
+
+```bash
+export DISCORD_WEBHOOK_URL=<test channel webhook>
 ./scripts/test-locally.sh
 ```
 
+It needs `yq` and a `config.dev.patch.yaml`, and loads `.env` if present.
 The script:
-1. Builds `mcp-server` and `bot` Dockerfile targets
-2. Starts a local `scraper-mcp-test` container on port 8080
-3. Waits for the MCP server to respond
-4. Runs the bot container with your `~/.claude` config bind-mounted
-   (for Claude session auth) and the secrets injected, executing
-   `run-scraper.sh` once
-5. Cleans up the MCP container on exit
+1. Merges `config.yaml` + `config.dev.patch.yaml` into `/tmp/config.dev.yaml`
+2. Builds the `scraper-mcp` and `bot` compose services
+3. Starts mongo + scraper-mcp with the dev overlay
+4. Waits until `http://localhost:8080/mcp` answers `tools/list`
+5. Runs a one-shot bot container executing `run-scraper.sh` (real scrape,
+   real Discord post)
+6. Stops the MCP stack on exit
 
-If the bot's prompt completes successfully, you'll see Discord messages
-appear in the test channel.
+If the scrape finds new jobs, the digest lands in the webhook's channel as
+one `.md` attachment. `[digest] no new jobs; nothing to post` means nothing
+unseen matched.
 
 ### Tweaks via env
 
 ```bash
-CLAUDE_CONFIG_DIR=~/work-claude ./scripts/test-locally.sh    # different config dir
-MCP_NAME=my-scraper-test ./scripts/test-locally.sh           # different test container name
+REQ_MAX_ITEMS=3 REQ_MAX_ITEM_CHARS=60 ./scripts/test-locally.sh   # tighter requirements bullets
 ```
+
+Only the variables the compose `bot` service passes through reach the
+container (`DISCORD_WEBHOOK_URL`, `MCP_URL`, `SCRAPE_TIMEOUT_MS`, `MAX_CHARS`,
+`MAX_FILE_BYTES`, `REQ_MAX_ITEMS`, `REQ_MAX_ITEM_CHARS`, `BOT_VERSION`, `TZ`). Values set in `.env` win over your shell: the
+script sources it after.
 
 ## Seeding reference data
 

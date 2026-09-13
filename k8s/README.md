@@ -95,7 +95,7 @@ curl -s localhost:8080/health
   intentionally left untouched. When wiring up a new CI, have it perform the same
   three steps as *Deploy* above: build+push both images, `sed` the tag into each
   manifest, `kubectl apply`.
-- **Schedule.** `cronjob.yaml` (`schedule: "0 11 * * *"`, `timeZone:
+- **Schedule.** `cronjob.yaml` (`schedule: "0 20 * * *"`, `timeZone:
   "Asia/Jakarta"`) is the source of truth. `config.yaml`'s `bot.schedule` is now
   informational only.
 - **Upgrading from the claude-code bot.** The bot no longer mounts a Claude session.

@@ -2,10 +2,10 @@
 
 Personal job scraper for Indonesian job boards (JobStreet, Glints, LinkedIn,
 Indeed). Flow: a Playwright/Python scraper is exposed as an **MCP HTTP server**
-(`scraper-mcp`, port 8080); a **Discord cron bot** (claude-code + supercronic)
-runs on a schedule, calls the MCP `scrape_jobs` tool, formats results, posts
-them to a Discord channel as a single markdown digest attachment, and records
-the run in **MongoDB**.
+(`scraper-mcp`, port 8080); a **Discord cron bot** (Node.js + supercronic, no
+LLM) runs on a schedule, calls the MCP `scrape_jobs` tool, renders the results
+into a single markdown digest, posts it to a Discord channel as an attachment,
+and records the delivery on the run's **MongoDB** document.
 
 Four Dockerfile stages: `scraper-cli` (`python -m scraper`),
 `mcp-server` (`python -m mcp_server.server`), `bot`, plus `mongo` (MongoDB 7).
@@ -50,9 +50,9 @@ Before first run, copy the `.example` files (see section below).
 
 This is for a **`claude` CLI you run on your host machine** (your laptop terminal,
 in the repo dir) to talk to the dockerized MCP server — handy for ad-hoc testing
-without going through the bot. This is a _different_ client from the dockerized
-bot, which ships its own baked `claude-code` and uses `host.docker.internal`
-(see [MCP on Docker](#mcp-on-docker)).
+without going through the bot. The bot itself uses neither Claude nor this file:
+it is a plain Node.js MCP client (`cron/lib/mcp.js`) that reads its endpoint
+from `MCP_URL` (see [MCP on Docker](#mcp-on-docker)).
 
 It works because `scraper-mcp` publishes its port to the host
 (`docker-compose.yml`: `ports: "8080:8080"`), so `localhost:8080` on your host
@@ -64,7 +64,8 @@ Copy the example to a project-root `.mcp.json` (where host `claude` picks it up)
 cp claude/mcp.json.example .mcp.json
 ```
 
-Then edit `.mcp.json` and change the URL from `host.docker.internal` to `localhost`:
+Then edit `.mcp.json` and change the URL from the in-cluster
+`job-scraper-mcp-service` to `localhost:8080`:
 
 ```json
 {
@@ -86,11 +87,12 @@ curl http://localhost:8080/health
 
 # MCP on Docker
 
-The bot container uses `http://host.docker.internal:8080/mcp` instead of
-`localhost` — `localhost` inside a container refers to the container itself, not
-the host. The value in `claude/mcp.json.example` already ships with the Docker
-URL and is baked into the bot image as `/workspace/scraper-bot/.mcp.json`
-(Dockerfile `bot` stage).
+The bot reads its MCP endpoint from the `MCP_URL` env var (`cron/run-digest.js`;
+code default `http://job-scraper-mcp-service/mcp`, the k8s Service).
+`docker-compose.yml` defaults it to `http://host.docker.internal:8080/mcp`
+instead of `localhost` — `localhost` inside a container refers to the container
+itself, not the host. Override it in `.env`. Nothing MCP-related is baked into
+the bot image.
 
 Compose wiring that makes this work:
 
@@ -108,12 +110,12 @@ Compose wiring that makes this work:
 
 # Copy the .example files
 
-| Example                         | Copy to                 | Purpose                                                          |
-| ------------------------------- | ----------------------- | ---------------------------------------------------------------- |
-| `.env.example`                  | `.env`                  | local compose env vars: Discord tokens, Mongo creds, `PROXY_URL` |
-| `config.dev.patch.yaml.example` | `config.dev.patch.yaml` | dev config overrides (merged over `config.yaml`)                 |
-| `scripts/ssh-tunnel.sh.example` | `scripts/ssh-tunnel.sh` | reverse SOCKS proxy helper — gitignored, contains real host/user |
-| `claude/mcp.json.example`       | `.mcp.json`             | MCP client config for Claude (update URL for host vs Docker)     |
+| Example                         | Copy to                 | Purpose                                                                             |
+| ------------------------------- | ----------------------- | ----------------------------------------------------------------------------------- |
+| `.env.example`                  | `.env`                  | local compose env vars: `DISCORD_WEBHOOK_URL`, `MCP_URL`, Mongo creds, `PROXY_URL`  |
+| `config.dev.patch.yaml.example` | `config.dev.patch.yaml` | dev config overrides (merged over `config.yaml`)                                    |
+| `scripts/ssh-tunnel.sh.example` | `scripts/ssh-tunnel.sh` | reverse SOCKS proxy helper — gitignored, contains real host/user                    |
+| `claude/mcp.json.example`       | `.mcp.json`             | MCP client config for an interactive host `claude` CLI only; the bot uses `MCP_URL` |
 
 `.env` is for local Docker Compose only. Production injects all env vars through
 GitHub Actions secrets/variables — it never reads this file.
@@ -246,24 +248,27 @@ docker rm -f job-scraper-mongo && docker volume rm job-scrapper_mongo-data
 **Deploy jobs** (sequential after their respective build):
 
 1. `deploy-mcp` (needs `build-mcp`): copies `docker-compose.yml` + `docker-compose.prod.yml` to the server via SCP, then SSHs in and runs `docker compose --profile mcp pull && up -d --no-build`, pinned to the immutable sha tag
-2. `deploy-bot` (needs `build-bot` + `deploy-mcp`): same flow for `--profile bot`, injects Discord tokens, Claude config paths, and `TZ`
+2. `deploy-bot` (needs `build-bot` + `deploy-mcp`): same flow for `--profile bot`, injects Discord tokens and `TZ`
 
 # Config: config.yaml + the dev patch
 
 `config.yaml` is the single source of truth, committed to the repo and baked
 into Docker images at build time. Key fields:
 
-| Field                   | Purpose                                                   |
-| ----------------------- | --------------------------------------------------------- |
-| `keywords`              | Job titles to search                                      |
-| `limit` / `concurrency` | Global result cap and parallel fetches                    |
-| `proxy`                 | SOCKS5/HTTP proxy URL; absent or `~` = direct connection  |
-| `max_age_hours`         | Drop jobs older than this                                 |
-| `filter.location`       | Keep only jobs matching these locations                   |
-| `bot.schedule`          | Cron expression for the Discord bot (e.g. `"0 11 * * *"`) |
-| `bot.message_template`  | Discord message format with `{field}` placeholders        |
-| `bot.max_chars`         | Truncate messages to this length                          |
-| `sites.*`               | Per-site `enabled`, `limit`, `url_template`, `fields`     |
+| Field                    | Purpose                                                         |
+| ------------------------ | --------------------------------------------------------------- |
+| `keywords`               | Job titles to search                                            |
+| `limit` / `concurrency`  | Global result cap and parallel fetches                          |
+| `proxy`                  | SOCKS5/HTTP proxy URL; absent or `~` = direct connection        |
+| `max_age_hours`          | Drop jobs older than this                                       |
+| `filter.location`        | Keep only jobs matching these locations                         |
+| `requirements_max_chars` | Optional cap on each job's `requirements` outline; `~` = no cap |
+| `bot.schedule`           | Cron expression for the Discord bot (e.g. `"0 11 * * *"`)       |
+| `sites.*`                | Per-site `enabled`, `limit`, `url_template`, `fields`           |
+
+The per-job Discord format is not in `config.yaml`: it lives in
+`prompts/response_template.md`, and the inline-fallback message cap is the
+`MAX_CHARS` env var (see [The digest pipeline](#the-digest-pipeline-cronrun-digestjs)).
 
 **Do you need a dev version?** Yes (recommended). Create `config.dev.patch.yaml`
 (copy from `config.dev.patch.yaml.example`) to override only what you need for
@@ -322,19 +327,18 @@ In the bot image, `supercronic` is the entrypoint, running
 `cron/run-scraper.sh`, which runs:
 
 ```bash
-claude --dangerously-skip-permissions --verbose --output-format stream-json \
-  -p "$(cat prompts/scrape-and-post.md)"
+node /workspace/scraper-bot/cron/run-digest.js
 ```
 
-`--verbose --output-format stream-json` makes claude emit one JSON event per
-step (tool calls, messages, result) so the run streams live to the log; default
-text mode prints only the final result at the very end.
-
-Output is logged to `/workspace/scraper-bot/cron/scraper.log`. `cron/entrypoint.sh`
-just `exec`s supercronic.
+(see [The digest pipeline](#the-digest-pipeline-cronrun-digestjs)). Output is
+teed to `/workspace/scraper-bot/cron/scraper.log`. A non-zero exit is logged as
+an `ERROR` line, but the script always exits 0: a retry would scrape again after
+the run already marked its jobs as seen (and possibly posted them).
+`cron/entrypoint.sh` just `exec`s supercronic.
 
 **Who triggers it in prod:** supercronic inside the deployed `bot` container,
-automatically on the baked schedule.
+automatically on the baked schedule. On Kubernetes the `job-scraper-bot` CronJob
+(`k8s/cronjob.yaml`) runs `run-scraper.sh` directly instead.
 
 **In dev**, the bot is overridden to `sleep infinity` (`docker-compose.dev.yml`),
 so it idles and does not run cron. To fire a run manually:
@@ -418,10 +422,9 @@ docker exec job-scraper-bot cat /workspace/scraper-bot/cron/scraper.log
 
 # How to debug the bot
 
-The `bot` service (`docker-compose.yml`) mounts your host `~/.claude` +
-`~/.claude.json` (or override via `CLAUDE_CONFIG_DIR`/`CLAUDE_CONFIG_FILE`),
-needs `DISCORD_BOT_TOKEN` + `DISCORD_CHANNEL_ID` from `.env`, and reaches the
-MCP server at `host.docker.internal:8080`.
+The `bot` service (`docker-compose.yml`) needs `DISCORD_WEBHOOK_URL` from `.env`
+and reaches the MCP server at `MCP_URL` (default
+`http://host.docker.internal:8080/mcp`). No Claude session is involved.
 
 In dev the bot idles (`sleep infinity`), so you can exec in freely.
 
@@ -431,20 +434,44 @@ In dev the bot idles (`sleep infinity`), so you can exec in freely.
 docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile bot up --build -d
 ```
 
-**Check which MCP target is active** — the baked `.mcp.json` inside the container
-uses `host.docker.internal:8080`. If you want to point the bot at a local
-(non-Docker) MCP server, you need `localhost:8080` — these are different hosts.
-
-**Interactive Claude session inside the bot:**
+**Check which MCP target is active:**
 
 ```bash
-docker exec -it job-scraper-bot sh -c "cd /workspace/scraper-bot && claude"
+docker exec job-scraper-bot printenv MCP_URL
 ```
 
-Then run `/mcp` to list available servers and tools. The MCP server exposes:
-`scrape_jobs`, `insert_scrape_run`, `get_latest_scrape_run`, `get_scrape_status`,
-`list_sites`, `get_config`, `update_config`, `get_scrape_response_structure`,
-`test_proxy_connection` — plus the `/health` HTTP endpoint.
+To point the bot elsewhere, set `MCP_URL` in `.env` and recreate the container.
+
+**Fire one run by hand** (real scrape, real Discord post):
+
+```bash
+# the cron entrypoint: tees to cron/scraper.log, always exits 0
+docker exec job-scraper-bot /bin/sh /workspace/scraper-bot/cron/run-scraper.sh
+
+# the digest alone: output on your terminal, real exit code
+docker exec job-scraper-bot node /workspace/scraper-bot/cron/run-digest.js
+```
+
+A run logs `[digest] …` progress lines, a `RESULT {…}` line with the Discord
+delivery outcome when there was something to post, and `MongoDB update failed: …`
+if the run document could not be patched.
+
+**Run the bot's tests locally** (Node 22+, no Docker):
+
+```bash
+cd cron && npm ci && npm test
+```
+
+`node --test` covers the template renderer, the requirements extractor (including
+35 hand-labelled real postings), the MCP client against a real SDK-built MCP server, a full `run-digest.js` run against a
+fake MCP server and a localhost webhook, and `send-digest.js`.
+
+**Calling MCP tools interactively** needs a `claude` CLI on your host (see
+[Test with local Claude and local MCP](#test-with-local-claude-and-local-mcp)).
+The MCP server exposes: `scrape_jobs`, `insert_scrape_run`, `update_scrape_run`,
+`get_latest_scrape_run`, `get_scrape_status`, `list_sites`, `get_config`,
+`update_config`, `get_scrape_response_structure`, `test_proxy_connection` — plus
+the `/health` HTTP endpoint.
 
 **Quick smoke tests** (TUI tests row, no full cron run needed):
 
@@ -455,30 +482,92 @@ Then run `/mcp` to list available servers and tools. The MCP server exposes:
 | **Discord** | Posts a throwaway digest via `cron/send-digest.js` from the bot container — the real send path |
 | **Cron**    | Fires the full cron job once (`run-scraper.sh`) — real scrape + real Discord posts          |
 
-# The scraping prompt (prompts/scrape-and-post.md)
+# The digest pipeline (cron/run-digest.js)
 
-This markdown file is what cron feeds to Claude on every run. It drives the full
-scrape-and-post pipeline:
+What cron runs on every tick. It is plain Node.js with no model in the loop, so
+the same scrape result always produces the same digest:
 
-1. **Scrape** — call MCP `scrape_jobs` with no arguments; runs every enabled site
-   for every configured keyword using `config.yaml` filters and returns aggregated
-   results grouped by keyword → site → jobs
-2. **Read the message template** — `prompts/response_template.md`, read fresh
-   every run
-3. **Format each job** — substitute `{field}` placeholders in the template; drop
-   lines where the field is null; reformat ISO dates; distil `{requirements}` down
-   to candidate-facing bullet points only
-4. **Assemble the digest** — every formatted job goes into one markdown file
-   (`/tmp/jobs-YYYY-MM-DD.md`), keywords as `#` sections
-5. **Post to Discord** — a single webhook POST via `cron/send-digest.js`: the
-   digest rides as a `.md` attachment, the message body carries only the summary
-   line and any error diagnostic. The script splits the file if it exceeds the
-   10 MiB upload cap, honours 429 `retry_after`, and falls back to inline
-   `MAX_CHARS` messages if uploads keep failing. The webhook URL comes from the
-   container env, never inlined
-6. **Record run** — call MCP `insert_scrape_run` with metadata, per-site counts,
-   raw results, and post status; job posting always takes priority over history
-   recording
+1. **Scrape** — connect to `MCP_URL` with `cron/lib/mcp.js`
+   (`@modelcontextprotocol/sdk` streamable HTTP client) and call `scrape_jobs`
+   with no arguments: every enabled site for every configured keyword, grouped
+   keyword → site → jobs. FastMCP runs this sync tool on its event loop and
+   sends no bytes until the scrape ends, and Node's default fetch would abort
+   after 300 s, so the client uses undici with socket header/body timeouts
+   disabled; `SCRAPE_TIMEOUT_MS` (default 30 min) is the single cap. A `{error}`
+   response (config failed validation) aborts the run
+2. **Format each job** — zero jobs means no file and no post. Otherwise
+   `cron/lib/format.js` renders every job through `prompts/response_template.md`.
+   A missing placeholder is removed with the ` | `, `,` or `:` separator it
+   leaves dangling; a line whose placeholders are all missing is dropped; a
+   static section header like `**Details**` whose whole body dropped goes too.
+   `posted_date` becomes `Weekday, DD Month YYYY`: zoned ISO timestamps are
+   converted to WIB (Asia/Jakarta), bare dates and zone-less timestamps are not
+   shifted, unparseable values pass through. `{requirements}` is replaced by
+   [the requirements block](#the-requirements-block)
+3. **Assemble the digest** — `jobs-<WIB YYYY-MM-DD>.md` in `DIGEST_DIR`
+   (default the OS temp dir): one `# <keyword>` section per keyword with jobs,
+   every block separated by a blank line, `---`, blank line. The message body
+   is an optional one-line `⚠️` diagnostic (scraper exit code ≠ 0 or per-site
+   errors), then `**Job digest — <WIB date>**`, a blank line, and
+   `_Scraped N jobs across K keyword(s) and S site(s) (bot <BOT_VERSION>). Errors: E._`
+   — the `(bot …)` part only when `BOT_VERSION` is set
+4. **Post to Discord** — `sendDigest()` from `cron/send-digest.js`: one webhook
+   POST with the digest as a `.md` attachment and the summary as the message
+   body. It splits the file at job boundaries over `MAX_FILE_BYTES` (default
+   10 MiB), retries 429 (honouring `retry_after`) and 5xx, and falls back to
+   inline `MAX_CHARS` messages if uploads keep failing. The webhook URL comes
+   from the container env
+5. **Record delivery** — MCP `update_scrape_run` on the run document
+   `scrape_jobs` inserted (its `mongo_id`), patching `discord_sent_status`
+   (`success` / `failed` / `skipped`) and `run_metadata.bot_post_status`
+   (`total_posted`, `total_jobs_posted`, `failed`, `delivery_mode`). Skipped
+   when `mongo_id` is null; a failed update is logged, never fatal; the webhook
+   URL is never sent to Mongo
+
+`run-digest.js` exits non-zero when the scrape could not run or a Discord message
+failed; `run-scraper.sh` logs that as an `ERROR` line and still exits 0.
+
+## The requirements block
+
+The scraper sends `requirements` as outline text (`## ` headings, `- ` list
+items, blank lines between paragraphs; see
+[docs/mcp.md](docs/mcp.md#requirements-format)). `cron/lib/requirements.js`
+classifies each heading by vocabulary (English and Indonesian, a few French) as
+qualifications, responsibilities, benefits, about, apply or info — a
+qualifications phrase wins outright, otherwise the most specific (longest)
+phrase wins — and renders:
+
+It takes the first of these that yields any bullets:
+
+| # | Source                                                                                                                                            | Block                                          |
+| - | ------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| 1 | qualifications section(s): listed ones before prose, and pure headings before ones that also name the duties ("Tâches et compétences recherchées") | `**Kualifikasi**`, merged in document order    |
+| 2 | no such heading, but a list whose items read like requirements ("Pengalaman minimal 3 tahun", "0-2 years of experience", "… is a plus")            | `**Kualifikasi**`                              |
+| 3 | prose sentences that state a requirement ("Kandidat harus memiliki gelar S1…", "… menjadi nilai tambah")                                          | `**Kualifikasi**`                              |
+| 4 | responsibilities: their list before prose about the role                                                                                          | `**Ringkasan**`                                |
+| 5 | any other non-company text                                                                                                                        | `**Ringkasan**`                                |
+| – | only about / benefits / apply / info text                                                                                                         | nothing: the `{requirements}` line is dropped  |
+
+It also recognizes plain-text headings (colon-terminated intro lines, lines made
+only of vocabulary words), inline labels (`Requirements: Go, SQL`), and a
+paragraph opening like "Kami mencari kandidat…" or "The ideal candidate…" as a
+headless qualifications section. Items are cleaned (bullet glyphs, numbering and
+emoji stripped; duplicates removed; link/email-only lines and calls to action
+dropped; location and perk lines dropped from a Kualifikasi, company-blurb
+sentences from a Ringkasan), truncated at a word boundary with `…`, and rendered
+as `• item`. Caps: `REQ_MAX_ITEMS` (default 5) and `REQ_MAX_ITEM_CHARS`
+(default 80).
+
+`cron/fixtures/requirements/` holds 79 real scraped outlines, and `golden.json`
+labels 35 of them by hand (the heading, and how each bullet starts);
+`lib/requirements.golden.test.js` checks them on every `npm test`. When a real
+posting renders badly, add its outline as a fixture, label it, then change the
+rules. Regenerate the corpus with
+`python scripts/dump_requirement_fixtures.py <scraper output_dir>` (emails and
+phone numbers are redacted).
+
+Every bot env var is listed in the header of `cron/run-digest.js` and in
+[docs/orchestration.md](docs/orchestration.md#bot-config-and-env).
 
 # GitHub Actions variables & secrets
 
@@ -498,11 +587,9 @@ Set these in your repository's **Settings → Secrets and variables**.
 
 **Variables** (plain text, shown in logs):
 
-| Variable                | Default        | Purpose                                             |
-| ----------------------- | -------------- | --------------------------------------------------- |
-| `MONGO_ROOT_USER`       | `admin`        | MongoDB root username                               |
-| `MONGO_DB_NAME`         | `job_scraper`  | Database name                                       |
-| `MONGO_COLLECTION_NAME` | `scrape_runs`  | Scrape history collection                           |
-| `CLAUDE_CONFIG_DIR`     | —              | Host path to `.claude` directory (mounted into bot) |
-| `CLAUDE_CONFIG_FILE`    | —              | Host path to `.claude.json` (mounted into bot)      |
-| `TZ`                    | `Asia/Jakarta` | Timezone for the bot container                      |
+| Variable                | Default        | Purpose                        |
+| ----------------------- | -------------- | ------------------------------ |
+| `MONGO_ROOT_USER`       | `admin`        | MongoDB root username          |
+| `MONGO_DB_NAME`         | `job_scraper`  | Database name                  |
+| `MONGO_COLLECTION_NAME` | `scrape_runs`  | Scrape history collection      |
+| `TZ`                    | `Asia/Jakarta` | Timezone for the bot container |

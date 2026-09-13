@@ -18,6 +18,7 @@ output_dir: output                             # optional, default 'output'
 max_age_hours: 24                              # optional, no default = no filter
 default_fields: [...]                          # optional, default 4 fields
 filter: {...}                                  # optional, no default = no filter
+requirements_max_chars: ~                      # optional, default null = no cap
 sites: {...}                                   # required, non-empty
 ```
 
@@ -133,6 +134,23 @@ filter:
   work_type: [remote, hybrid]
 ```
 
+### `requirements_max_chars` (optional, default null)
+
+Positive integer or null. Hard cap on each job's `requirements` outline (the
+description as outline text — see [`mcp.md`](mcp.md#requirements-format)),
+applied after conversion. The cut lands at the last line break inside the
+budget, so no heading or list item is split (a first line longer than the
+budget is cut at the budget), and a trailing `…` line marks it. Outlines within
+the budget are untouched.
+
+- Default null (`~`): no cap. The bot picks its bullets from the full outline,
+  so set this only when run documents in MongoDB need bounding.
+- Only applies to sites whose `fields` include `requirements`.
+
+```yaml
+requirements_max_chars: 4000
+```
+
 ### `sites` (required)
 
 Mapping from site-name → site config. Site name must match a registered
@@ -214,6 +232,7 @@ The loader (`load(path)`) enforces:
 | `limit`                   | Integer >= 1                                     | `ConfigError`     |
 | `concurrency`             | Integer >= 1                                     | `ConfigError`     |
 | `max_age_hours`           | Integer >= 1 or null                             | `ConfigError`     |
+| `requirements_max_chars`  | Integer >= 1 or null                             | `ConfigError`     |
 | `sites`                   | Non-empty mapping                                | `ConfigError`     |
 | `sites.<name>.url_template` | Non-empty string with valid placeholders only  | `ConfigError`     |
 | `default_fields` entries  | Strings; unknown names → warning, dropped       | `[config] warning` (load continues) |
@@ -293,6 +312,7 @@ config.output_dir         # Path
 config.default_fields     # tuple[str, ...]
 config.max_age_hours      # int | None
 config.filter             # dict[str, list[str]]
+config.requirements_max_chars  # int | None
 config.sites              # tuple[SiteConfig, ...]
 
 config.fields_for("glints")    # frozenset[str]

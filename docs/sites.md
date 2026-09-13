@@ -26,8 +26,14 @@ search result page (no detail-page fetch).
 **✅** = reliably populated. **partial** = sometimes populated when the
 listing exposes it. **❌** = currently never populated by the parser.
 
-`requirements` is fetched via a second request to each job's detail URL
-and requires `requirements` to be in the site's `fields` list.
+`requirements` is the job description as outline text, produced by
+`scraper/sites/_text.py::html_to_outline` in every adapter: `## ` heading
+lines, `- ` list items, blank lines between paragraphs (see
+[`mcp.md`](mcp.md#requirements-format)). Indeed takes it from the search
+results while parsing; jobstreet, glints and linkedin fetch it with a second
+request to each job's detail URL (`parse_detail()`). Either way it requires
+`requirements` to be in the site's `fields` list, and `requirements_max_chars`
+caps it when set (see [`configuration.md`](configuration.md)).
 
 Implication for filters: `work_type` and `employment_type` filters mostly
 affect Glints. Other sites pass via the conservative null-rule.

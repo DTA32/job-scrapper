@@ -5,6 +5,11 @@ over streamable HTTP (default `0.0.0.0:8080`). External Claude sessions
 register it and call its tools to inspect, modify, and run the scraper without
 shelling into the container.
 
+The scheduled Discord bot is also a client, but not an LLM one:
+`cron/lib/mcp.js` (`@modelcontextprotocol/sdk`, streamable HTTP) calls
+`scrape_jobs`, then `update_scrape_run` with the returned `mongo_id` to record
+the Discord delivery on that run. See [`orchestration.md`](orchestration.md).
+
 This page is the canonical reference for what those tools accept and return.
 
 ## Boot
@@ -104,9 +109,12 @@ Read-only. Returns canonical response contract for `scrape_jobs`.
 ```json
 {
   "tool": "scrape_jobs",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "job_fields": ["site", "matched_keyword", "title", "..."],
-  "top_level_fields": ["ok", "keywords", "requested_sites", "exit_code", "results", "errors"],
+  "field_formats": {
+    "requirements": "Outline text from the job description: '## ' opens a heading line, '- ' opens a list item, a blank line separates paragraphs. Null when no description was found; capped at requirements_max_chars when set."
+  },
+  "top_level_fields": ["ok", "keywords", "requested_sites", "exit_code", "results", "errors", "mongo_id"],
   "site_result_fields": ["site", "keyword", "fields", "max_age_hours", "filter", "count", "jobs"],
   "error_fields": ["keyword", "site", "reason", "attempts"],
   "sample": { "...": "example payload" }
@@ -114,6 +122,9 @@ Read-only. Returns canonical response contract for `scrape_jobs`.
 ```
 
 Use this when you need strict output formatting in downstream automations.
+`field_formats` describes job fields whose string value has its own format —
+currently only `requirements` (see [`requirements` format](#requirements-format));
+the sample job carries an example outline.
 
 ### `update_config`
 
@@ -277,6 +288,7 @@ aggregated results.
 
 ```json
 {
+  "ok": false,
   "keywords": ["data analyst"],
   "requested_sites": ["linkedin", "indeed"],
   "exit_code": 0,
@@ -298,12 +310,42 @@ aggregated results.
   ],
   "errors": [
     {"keyword": "data analyst", "site": "glints", "reason": "fetch failed"}
-  ]
+  ],
+  "mongo_id": "66d000000000000000000001"
 }
 ```
 
 `results` is always grouped by keyword first, then site. `errors` collects
-any pair whose JSON couldn't be read or whose fetch failed.
+any pair whose JSON couldn't be read or whose fetch failed; `ok` is false
+whenever `errors` is non-empty. `mongo_id` is the id of the run document
+`scrape_jobs` inserts into MongoDB (null when Mongo was unreachable); pass it
+as `run_id` to `update_scrape_run` to add columns to that run. A config that
+fails validation returns `{"error": "<reason>"}` instead of a run.
+
+#### `requirements` format
+
+Each job's `requirements` is its description converted to outline text by
+`scraper/sites/_text.py::html_to_outline`, which every site adapter applies:
+
+| Line | Meaning | Produced from |
+|---|---|---|
+| `## <heading>` | heading | `<h1>`–`<h6>`; a line whose only content is bold text (including bold runs wrapping `<br>`s); markdown `**x**` typed into an editor |
+| `- <item>` | list item | `<li>`; a line opening with a bullet glyph, `1.` or `1)` |
+| blank line | paragraph break | block elements and `<br><br>` (a single `<br>` is only a line break) |
+| anything else | plain text | |
+
+Decorative rule lines (e.g. `------`) are dropped, and converting an outline
+again leaves it unchanged. `null` when no description was found.
+
+```
+## Requirements
+- 2+ years of Python
+- Familiar with SQL
+```
+
+When `requirements_max_chars` is set in `config.yaml`, the outline is cut at the
+last line break inside that budget and a trailing `…` line marks the cut (see
+[`configuration.md`](configuration.md)). By default there is no cap.
 
 ## Operational rules for Claude callers
 
