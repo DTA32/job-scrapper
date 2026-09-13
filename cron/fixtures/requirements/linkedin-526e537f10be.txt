@@ -1,0 +1,87 @@
+Référence
+
+2131/QC/1108
+
+Date de démarrage
+
+Au plus vite
+
+Localisation du poste
+
+100% télétravail (présence occasionnelle au bureau de Montréal)
+
+Durée
+
+Permanent
+
+## Description
+Nous recherchons un Concepteur Cobol / AS400 pour rejoindre notre équipe de conseillers du bureau de Montréal.
+
+Ce poste est en mode 100% télétravail avec présence occasionnelle au bureau de Montréal.
+
+Agissant à titre de conseiller / consultant de Chrome Technologies, le candidat interviendra auprès de nos clients dans la réalisation des projets qu'ils nous ont confiés.
+
+Tâches
+
+Dans le cadre de l'évolution et de l'optimisation de ses solutions technologiques, notre équipe est à la recherche d'un Concepteur Cobol/AS400 pour contribuer activement à la conception et à l'évolution d'un système interne.
+
+Ce rôle s'adresse à un professionnel expérimenté, ayant une forte capacité d'analyse et une vision globale des systèmes, capable d'intervenir en amont des développements afin d'orienter les décisions liées à la conception des solutions. À ce titre, le concepteur sera appelé à évaluer la pertinence de développer de nouvelles fonctionnalités, à analyser les impacts des modifications ou retraits existants, ainsi qu'à assurer la robustesse et la performance du système, notamment en lien avec sa volumétrie et ses mécanismes de reprise.
+
+En étroite collaboration avec l'architecte en place, cette personne jouera un rôle clé dans le soutien de la conception et agira comme référence technique auprès des équipes internes et des partenaires externes. Elle participera également à l'évolution du système Tango en environnement AS400, en contribuant autant aux ajouts de fonctionnalités qu'à la résolution d'anomalies.
+
+Le rôle nécessite un leadership affirmé, une capacité à influencer et à guider les équipes, ainsi qu'une expérience antérieure en tant que tech lead ou personne-contact, notamment pour la réalisation d'estimations et la coordination de travaux. Des interactions fréquentes avec différentes équipes utilisatrices ainsi qu'avec des fournisseurs anglophones font également partie du quotidien.
+
+Ce poste pourrait également convenir à un développeur sénior ayant évolué vers des responsabilités de conception ou souhaitant mettre à profit son expérience pour revenir dans un environnement AS400.
+
+## Tâches Et Compétences Recherchées
+- Réaliser la conception technique ou systémique détaillée des solutions, conformément à l'architecture élaborée dans des domaines de spécialité tels : le génie logiciel, l'infrastructure technologique, la sécurité de l'information, la gestion des données ou encore, l'intégration de données et d'applications.
+- Concevoir des composants de solutions structurés, novateurs, performants et idéalement réutilisables, qui s'intégreront harmonieusement dans l'écosystème de l'entreprise.
+- Agir à titre de contributeur technique de l'équipe de livraison de solutions et superviser les efforts de réalisation afin de s'assurer que l'intégrité du design est préservée et dans certains cas, construire et mettre en place les composantes les plus complexes, le tout en s'assurant du respect des normes et règles d'intégration, de conception, de développement et de sécurité de l'information.
+- Configurer les outils et composants logiciels, les environnements de développement et de déploiement dans le contexte As400 afin d'optimiser l'efficacité des équipes de réalisation de solutions.
+- Supporter l'opérationnalisation et le déploiement des solutions.
+- Promouvoir la réutilisation des composants existants et participer au choix de progiciels, de services ou de composants externes
+- Travailler en collaboration avec les différents intervenants TI dans le but de concevoir des composants qui respectent les encadrements d'entreprise et qui sont viables, efficaces et rentables.
+- Par une vigie constante des tendances au sein de sa spécialité, participer à l'évolution et à la promotion des méthodologies, cadres, outils et services de pointe qui respectent les normes et standards de l'entreprise.
+- S'assurer que la documentation technique et de conception nécessaire à la pérennité des éléments conçus est produite, valide et maintenue à jour.
+- Encadrer les ressources internes, prestataires de services externes et tiers indépendants qui participent à la conception et à la réalisation technique des solutions.
+- S'intégrer à ou être appelé à soutenir l'équipe de support en tant que deuxième niveau de support afin d'assurer que les services demeurent fonctionnels.
+- Soutenir au besoin les cellules de travail qui oeuvrent à la résolution des incidents majeurs et des problèmes.
+- Participer au plan d'évolution des applications et systèmes technologiques.
+
+Exigences
+
+- Plus de 10 ans d'expérience en technologies de l'information, dont un minimum de 8 ans dans le domaine d'expertise ciblé.
+- Maîtrise des techniques, cadres de référence et méthodologies propres à son domaine d'expertise (SAFe®, Agile, MVP, Software Development Lifecycle, Test-Driven Development, Behaviour-driven development, etc.).
+- Excellent communicateur, structuré et vulgarisateur technique hors pair possédant un bon esprit de synthèse et sachant travailler efficacement en équipe.
+- Leader naturel avec une capacité d'influencer et d'orienter les autres, particulièrement au niveau des équipes de livraison de solutions et des collaborateurs en périphérie de son champ d'action.
+- Grande capacité d'identification et de résolution de problèmes.
+- Développement de solutions d'intégration interapplications ou intersystèmes
+- Excellentes aptitudes à la coordination, à la négociation et à la prise de décision.
+- Connaissance de l'industrie de l'assurance et des services financiers (atout).
+
+Environnement technologique
+
+- Intégrations
+- Environnements legacy
+- Méthodologies Agile
+- Modernisation et gestion d'obsolescence
+- Système d'exploitation OS400 sur IBM i
+- Navigation session 5250
+- Librairie, objets, membres, sources
+- IFS
+- Soumission et gestion de job IBM i
+- Programmation / conception de solution
+- COBOL OPM / ILE
+- RPG ILE / FREE
+- CLP OPM / ILE
+- Fichiers PF / LF / PRTF / DSPF
+- DB2 for IBM i
+- SQL native and embedded
+- Sécurité sur IBM i
+- Intégrations legacy et moderne
+- Modélisation C4 / UML
+- Production de documentation vivante (MarckDown)
+
+Postuler à cette opportunité
+
+Retour

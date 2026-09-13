@@ -1,0 +1,34 @@
+Kami mencari Product Owner yang berorientasi pada dampak dan manfaat, untuk mengelola pengembangan aplikasi terintegrasi yang akan digunakan oleh pelaku usaha dalam mengelola dan mengotomatisasi berbagai proses bisnis inti—seperti keuangan, SDM, manufaktur, rantai pasok, dan penjualan—dalam satu platform terpusat. Peran ini bertanggung jawab memastikan produk menyelesaikan masalah nyata (operasional, pencatatan, stok, keuangan, penjualan) dan mendorong peningkatan kapasitas bisnis UMKM melalui fitur yang mudah dipakai, bernilai tinggi, dan scalable.
+
+Anda akan memimpin proses discovery → delivery → launch → iterasi, menjadi jembatan antara kebutuhan pasar, tujuan bisnis Perusahaan, dan eksekusi tim produk & engineering.
+
+## Kualifikasi
+- Pengalaman minimal 1 tahun bekerja sebagai Product Manager / Product Owner / Business Analyst atau peran serupa.
+- Pernah memimpin tim (minimal 2 Orang)
+- Memahami dengan kuat metodologi Agile/Scrum
+- Menguasai manajemen backlog, user stories, dan prioritisasi.
+- Memiliki kemampuan berpikir analitis dan pemecahan masalah yang sangat baik
+- Kuat di problem solving, analytical thinking, dan pengambilan keputusan berbasis data.
+- Memahami dasar software development (SDLC) dan mampu berkomunikasi efektif dengan tim teknis.
+- Komunikasi secara efektif untuk mengelola stakeholder lintas fungsi (engineering, design, ops, Marketing ,sales, CS, Management).
+- Memiliki empati tinggi pada pengguna dan tertarik pada teknologi terkini yang memberikan dampak positif
+- Mampu bekerja di lingkungan yang dinamis serta cepat belajar.
+- Mempunyai kemampuan eksplorasi dan kreatif yang tinggi
+
+## Tanggung Jawab Utama
+- Menyusun dan memiliki visi, strategi, dan roadmap produk (jangka pendek-menengah).
+- Menentukan prioritas roadmap berdasarkan impact ke pengguna + nilai bisnis + feasibility engineering.
+- Melakukan riset pengguna : interview, observasi proses bisnis, pain points
+- Melakukan validasi fitur (prototype testing, pilot/early adopter, eksperimen ringan) sebelum development besar.
+- Mengelola product backlog end-to-end: menulis user stories, acceptance criteria, grooming, dan prioritas sprint.
+- Berkolaborasi erat dengan Tim produk, Developer, UI/UX, dan QA untuk memastikan delivery tepat waktu dan berkualitas.
+- Mengelola SOP Produk (workflow), dokumentasi PRD/spec, keputusan produk, dan catatan rilis.
+- Memastikan requirement jelas dan dapat dieksekusi (spesifikasi, alur, edge case, dan definition of done).
+- Memantau performa produk dengan metrik yang relevan untuk pelaku usaha
+- Mengumpulkan feedback dari pengguna (support, CS, komunitas) untuk iterasi berkelanjutan.
+- Berkolaborasi dengan tim bisnis untuk strategi adopsi, onboarding, edukasi pengguna, dan peningkatan penggunaan fitur.
+
+## Nilai Tambah
+- Pernah mengembangkan produk ERP/POS/Accounting/Inventory atau sistem B2B SaaS.
+- Pernah terlibat dalam onboarding user non-tech (UMKM) dan pembuatan materi edukasi.
+- Pengalaman melakukan pilot project dengan merchant/UMKM.

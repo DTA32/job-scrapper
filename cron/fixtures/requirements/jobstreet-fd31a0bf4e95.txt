@@ -1,0 +1,56 @@
+We're hiring a Lead AI Product Engineer to take technical and product ownership of the AI systems at the heart of Kulu. This is a hands-on, player-coach role: you will lead engineers, but we are not looking for a traditional engineering manager who manages process and leaves technical decisions to the team. We want someone who understands the product deeply, develops strong opinions about how it should work, guides and reviews engineers directly, investigates failures, makes architectural decisions and - when it's the fastest way forward - opens the codebase and ships things themselves.
+
+Our product is built around real-time AI agents interacting with users, so many of our hardest product decisions are also engineering decisions. A prompt change can be a production behaviour change. A race condition can cause an agent to act on information that was true two seconds ago but is now wrong. Deciding what belongs in deterministic code versus an LLM can fundamentally change reliability. We need someone who enjoys thinking deeply about those problems.
+
+## About Kulu
+Kulu is a high-performance, high-bandwidth communication team. We run live daily standups, Slack constantly, and jump into huddles rather than letting long async threads develop. Product, engineering and commercial conversations overlap heavily. This suits people who enjoy working closely with highly engaged colleagues, talking through hard problems in real time, sharing unfinished work, and moving quickly as new information emerges. It's probably not the right environment if your ideal style is to receive a well-defined problem, disappear for the day, and communicate primarily through async updates. There will be focused individual work — but we optimize for the speed and quality of the team as a whole.
+
+We are deliberately moving toward a more in-person culture in Bali, and this role will be a role model for it - over time taking substantial responsibility for building the team and creating a high-performance office culture where exceptional engineers want to work.
+
+Tasks
+
+You will be the senior technical and product authority for the behaviour of our AI product - responsible not just for engineers shipping software, but for building the right system, in the right way, producing the right behaviour for users.
+
+- AI systems and agent architecture - Design and evolve the production agent architecture: LLM and multi-agent orchestration, control flow and state, deterministic logic vs model-controlled decisions, tool use, grounding, context management, prompts, async behaviour, model selection, and reliability. Think of the agent as a complete production system, not an LLM with a prompt.
+- Agent behaviour and product judgment - Deeply understand how our agents behave with real users. When something goes wrong: why did the agent do that, what should it have done, was the cause the prompt, architecture, model, stale state or timing — and does the fix address the underlying failure mode or just one example? You'll define good agent behaviour and translate it into prompts and architecture.
+- Agent root-cause analysis - The agent is asynchronous, probabilistic and stateful. When it misbehaves in a real session - acts on stale screen state, skips a workflow step, hallucinates a capability, interrupts at the wrong moment — trace the failure to its true cause and encode that understanding back into the agent rather than patching one example. Raise this standard across the team.
+- Technical direction of the agent - Own how the agent is engineered: orchestration and workflow architecture, what's deterministic vs delegated to an LLM, how it consumes screen context and real-time signals, which models power which behaviours, how behaviour is evaluated, and when an approach should be replaced. Form strong opinions, and change them when the evidence says you're wrong.
+- Hands-on building - You will still be an engineer: reading production code, reviewing PRs, debugging hard failures, editing and testing prompts, prototyping, evaluating models, and occasionally shipping production changes yourself. If your ideal next role removes you from the codebase entirely, this is probably not it.
+- Leading the engineering team - Directly lead engineers and own both their output and development: assigning ownership, guiding and reviewing work, frequent feedback, performance reviews, salary and promotion input, hiring needs, and normal people management including underperformance. Autonomy does not mean an absence of leadership - understand the work well enough to give useful direction and make strong engineers better.
+
+## What success looks like
+The North Star is simple: is the agent getting better over time? We expect the quality of the agent experience - judgement, reliability, helpfulness, consistency - to improve continuously with real users. If it stagnates or degrades, that's a failure of technical and product leadership regardless of activity underneath it. Work can be delegated; responsibility for the resulting agent experience is not. The role isn't measured by velocity, test coverage or process metrics - those are means to an end. The end is a measurably better AI product.
+
+In your first months: develop a deep understanding of how our system behaves in production; establish clear ways to measure agent quality; become one of the people best able to explain why an agent behaved incorrectly; establish clear technical ownership; improve root-cause analysis; fix architectural weaknesses behind recurring failures; raise the quality of technical decision-making; personally solve some of our hardest AI product problems; and develop the engineers around you.
+
+Requirements
+
+- Exceptional software engineering fundamentals, and significant experience building production applications with modern LLMs
+- Strong intuition for LLM behaviour and prompt design; experience designing agentic or multi-step AI systems
+- Excellent product judgment and the ability to reason deeply about complex system behaviour
+- Experience with asynchronous, distributed or real-time applications; comfort across APIs, backends and AI orchestration
+- Ability to understand a large production codebase; strong architectural judgment
+- High agency and ownership; experience guiding, mentoring or leading engineers; clear communication
+- Fluent/Advanced spoken and written English, with the ability to communicate confidently and professionally. Our company language is exclusively English.
+
+We care far more about evidence you can do these things than titles - you do not need to have been a Head of Engineering. We're particularly interested in founding engineers, senior/staff AI product engineers, technical founders, and technical leads in small, high-performing teams.
+
+Nice to have (optional):_ Experience building voice/video agents or real-time conversational AI; strong Python or TypeScript skills; backend or full-stack experience; real-time media and streaming (e.g., LiveKit, Pipecat); speech pipelines (STT/TTS); LLM APIs (e.g., Gemini, OpenAI, Anthropic) and orchestration frameworks; evals and observability (e.g., Langfuse or equivalent); relational databases and vector/retrieval systems.
+
+## What we are not looking for
+This is unlikely to be right if your model of leadership is primarily “hire great engineers, give them goals and get out of the way.” We're also unlikely to fit if you no longer want to write or closely inspect code, see product judgment as someone else's job, default to process and test coverage as the answer to quality problems, are uncomfortable challenging engineers' decisions, prefer managing through tickets and ceremonies, want a highly asynchronous low-communication environment, or have mainly worked in classical ML or model training without substantial application-layer AI experience.
+
+Benefits
+
+- IDR 60–100m/month + 0.5–1% equity
+
+## Our Operating Principles
+- Always Be Hustlin’ – Move fast, outwork the competition, stay scrappy.
+- Relentlessly Curious - Reason from first principles, question assumptions and explore better ways.
+- Super Pumped – Show relentless enthusiasm and drive.
+- Make Magic – Create experiences that delight customers.
+- Obsess Over the Details – Perfect the product experience, no matter how small.
+- Big Bold Bets – Think big, take risks and go after huge, transformative opportunities.
+- Ownership is Key - Own the outcome, not just the task.
+
+We intentionally call this role Lead AI Product Engineer rather than Head of Engineering - we want someone who still identifies as a builder. For an exceptional person who can lead both the product and the team at increasing scale, there is a natural path toward Head of AI Product Engineering and broader technical leadership as Kulu grows.

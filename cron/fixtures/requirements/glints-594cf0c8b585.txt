@@ -1,0 +1,26 @@
+## Tanggung Jawab
+- Mengolah dan menganalisis data bisnis perbankan.
+- Membuat laporan dan dashboard daily, weekly, dan monthly.
+- Monitoring KPI, target, achievement, dan produktivitas tim.
+- Melakukan validasi, cleansing, dan memastikan akurasi data.
+- Mengidentifikasi tren dan memberikan insight serta rekomendasi bisnis.
+- Menyajikan hasil analisis kepada Direktur dan Management.
+- Mengembangkan sistem reporting agar lebih efektif dan minim human error.
+
+Kualifikasi:
+
+Minimal D3/S1, diutamakan jurusan terkait data, IT, ekonomi, atau manajemen.
+
+Pengalaman sebagai Data Analyst, MIS, Reporting Analyst, atau Business Analyst.
+
+Pengalaman min 3 - 5 tahun sebagai data analis.
+
+Menguasai Excel/Google Sheets (Mahir).
+
+Memahami dasar SQL.database atau Power BI/Looker Studio menjadi nilai tambah.
+
+Memiliki kemampuan analitis, problem solving, dan attention to detail.
+
+Mampu menyampaikan insight dan melakukan presentasi kepada Direktur / Management.
+
+Pengalaman di perbankan, fintech, BPO menjadi nilai tambah.

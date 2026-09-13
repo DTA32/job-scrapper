@@ -1,0 +1,64 @@
+## About BJAK
+The original mission of BJAK is we believe people deserve smarter ways to plan, save and grow their money. This is the origin of our name.
+
+Started in 2019, we built the first mobile-first, insurance platform, enabling insurance to be accessible online by millions in the region. Today, its the leading insurance platform in Southeast Asia.
+
+Today, we are expanding ways to help people in the region — this includes spending, saving, investing, exchanging, travelling, and more. Our mission is help people get more from their money every day.
+
+We have teams working around the world, with over 20 nationalities from our offices and remotely, who truly enjoys their work. We are looking for the most talented and driven people we can find. We are looking for people who work for their passion, not counting hours. Who loves building great next-generation products, not status quo. Who cares about redefining how everyone around us can get the best financial applications, not for an exclusive few.
+
+If you're this person, we'd love to talk to you.
+
+## The Role
+We are looking for backend engineers to build the core systems behind BJAK's AI Neobank app.
+
+This role is for engineers who can build reliable APIs, workflows and financial product infrastructure that can scale across markets, partners and millions of users.
+
+## What You'll Own
+- Build backend services, APIs and workflows for the AI Neobank app.
+- Support products across insurance, payments, wallet, savings, investing, travel and financial services.
+- Design reliable systems for user accounts, transactions, partner integrations, reconciliation, notifications and operations.
+- Work with product and mobile teams to ship customer-facing journeys quickly.
+- Integrate with banks, payment gateways, insurers, data providers and other partners.
+- Improve system reliability, observability, security and performance.
+- Build systems that are practical, auditable and ready for regulated financial products.
+
+## What We're Looking For
+- 3+ years of backend engineering experience.
+- Strong fundamentals in APIs, databases, system design and production debugging.
+- Experience building scalable services and integrating third-party systems.
+- Good understanding of security, reliability, data quality and operational edge cases.
+- Able to make practical trade-offs between speed, quality and risk.
+- Comfortable working with product, mobile, operations and business teams.
+- Experience in fintech, payments, insurance, lending, banking or regulated products is a strong advantage.
+
+## The Kind of Builder We Want
+- Builds systems that work in the real world, not just on diagrams.
+- Thinks through edge cases, failure modes and operational impact.
+- Can move fast without creating fragile foundations.
+- Takes ownership of production issues and long-term reliability.
+- Explains clearly what they personally built versus what the team delivered.
+
+## This Role Is Not For
+- Engineers who only want isolated backend tasks.
+- People who ignore security, data consistency, monitoring or operational risk.
+- Developers who cannot work with fast-changing product requirements.
+- Candidates who talk about scale but have not handled production systems.
+- People who exaggerate impact without being clear on ownership.
+
+## Location
+This role is remote, but candidates must be based in Indonesia. We are hiring specifically for this market, so applicants should already be based in Indonesia.
+
+## Language
+English is our main working language across global teams. Strong English communication is required.
+
+## Interview Process
+Our process is designed to move fast:
+
+- Online assessment or practical task
+
+- Technical interview
+
+- CEO / final round
+
+For strong candidates, we aim to complete the process and make an offer within 1 week from the start of the interview process. Candidates who complete assessments quickly will be prioritized.

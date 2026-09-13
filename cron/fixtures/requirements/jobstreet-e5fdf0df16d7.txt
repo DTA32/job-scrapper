@@ -1,0 +1,22 @@
+## Job Description
+1 Merancang dan mengembangkan layanan backend
+
+2 Otentikasi
+
+3 Integrasi
+
+## Job Requirement
+1 NestJS
+
+2 Node.js
+
+3 PostgreSQL
+
+4 Redis
+
+5 Docker
+
+6 REST API
+
+## Skill Requirement
+Information Security

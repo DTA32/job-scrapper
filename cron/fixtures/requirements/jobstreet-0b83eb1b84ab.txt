@@ -1,0 +1,20 @@
+## About the role
+This role involves developing AI-assisted tools, machine-learning integrations, or generative AI workflows. You will design, develop, test, debug, deploy, and maintain software applications and production tools. You will participate in software development projects from initial requirements through implementation and support, and contribute to the research and development of new features, technologies, and tools that improve production workflows. You will also contribute to the evaluation and development of AI-assisted tools where appropriate.
+
+## Key responsibilities
+- Develop AI-assisted tools, machine-learning integrations, or generative AI workflows
+- Design, develop, test, debug, deploy, and maintain software applications and production tools
+- Participate in software development projects from initial requirements through implementation and support
+- Participate in the research and development of new features, technologies, and tools that improve production workflows
+- Contribute to the evaluation and development of AI-assisted tools where appropriate
+
+## About you
+- Bachelor's degree in computer science, Software Engineering, or a related field, or equivalent professional experience
+- Two or more years of relevant software development experience
+- Strong software development experience using Python and JavaScript
+- Experience with Angular or another modern front-end framework
+- Full-stack software development experience
+- Experience designing and developing web-based or standalone applications
+- Experience developing and integrating REST APIs and third-party services
+- Experience working on Linux and Microsoft Windows operating systems
+- Experience using Git or another source-control system and participating in code reviews

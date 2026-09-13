@@ -1,0 +1,32 @@
+We think you also hate when travel app is giving you a headache, right? A slight misinformation can ruin the trip.
+
+That is exactly what we are tackling as t-fam! Making sure that our 50+ million users have the best experience in crafting their own adventure.
+
+## Your main duties in flying with us
+- Build and extend our backend code based on SOLID Principle and Clean Code
+- Build APIs that serve our frontend apps – Benchmark and improve performance
+- Maintain and extend our test suite
+- Refactor and improve existing code to incorporate better patterns
+- Document and write about the work
+- Create unit test and implement self test to make sure the code is running well
+- Assist technical lead to review and follow up code that have been developed.
+
+## Your main duties in flying with us
+- Bachelor degree or equivalent, preferably in Computer Science/Information Technology
+- 0-2 years of experience in backend development
+- Experienced in using Golang and Java
+- Experience working with RDBMS or NoSQL is a plus
+- Experience working with Redis and Memcached is a plus
+- Experience with Elastic Search
+- Experience with CI/CD, TDD, Refactor/Rewrite system
+- Experience with Event-Driven Architecture such as Kafka or RabbitMQ
+- Experience with Git Flow
+- Experience with Kubernetes is a plus
+- Knows how to analyze log
+- Experience with pair programming is a plus
+- Experience with Linux syntax, Docker is a plus
+- Good sense of prioritization and product knowledge/product ownership
+- Critical thinking, fast learner, and excellent communication skills
+- Well-motivated and responsible for the deadline,
+
+In the event that you haven’t received any updates after 3 weeks, your data will be kept and we may contact you for another career destination. Meanwhile, discover more about tiket.com on Instagram, LinkedIn, or YouTube.

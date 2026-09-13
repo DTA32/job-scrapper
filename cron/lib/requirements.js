@@ -25,7 +25,8 @@ const VOCABULARY = {
     'what we are looking for', 'who we are looking for', 'what we look for', 'looking for',
     'we need', 'what we need', 'we want', 'who we want', 'what you need', 'what you will need',
     'you will need', 'what you bring', 'you bring', 'you have', 'you should have', 'what you have',
-    'what it takes', 'who you are', 'about you', 'your profile', 'candidate profile',
+    'what it takes', 'you need', 'need to have', 'to thrive', 'to succeed', 'mandatory belongings',
+    'who you are', 'about you', 'your profile', 'candidate profile',
     'profil kandidat', 'ideal candidate', 'kandidat ideal', 'yang kami cari', 'kami mencari',
     'your background', 'educational background', 'latar belakang pendidikan',
     'skill', 'skills', 'skillset', 'skill set', 'hard skills', 'soft skills', 'technical skills',
@@ -81,7 +82,7 @@ const VOCABULARY = {
     'contract', 'kontrak', 'work arrangement', 'work mode', 'industry', 'industri', 'deadline',
     'closing date', 'additional information', 'job category', 'job family', 'job family group',
     'requisition id', 'reference', 'référence', 'localisation', 'durée', 'disclaimer',
-    'this role is not for', 'mandatory belongings',
+    'this role is not for',
   ],
 };
 const OTHER_KINDS = ['responsibilities', 'benefits', 'about', 'apply', 'info'];
@@ -110,7 +111,7 @@ const INLINE_LABEL = /^([^:：]{3,40})[:：]\s+(\S.*)$/;
 const LINK_OR_EMAIL = /(https?:\/\/\S+|www\.\S+|[\w.+-]+@[\w-]+\.[\w.-]+)/gi;
 const HAS_LINK_OR_EMAIL = new RegExp(LINK_OR_EMAIL.source, 'i');
 const CALL_TO_ACTION =
-  /\b(apply now|apply here|apply via|click (here|the link)|kirim (cv|lamaran)|send (your )?(cv|resume)|lamar sekarang|segera lamar|daftar sekarang|only shortlisted|hanya kandidat|submit your (cv|resume|application))\b/i;
+  /\b(apply now|apply here|apply via|click (here|the link)|kirim (cv|lamaran)|send (your )?(cv|resume)|lamar sekarang|segera lamar|daftar sekarang|only shortlisted|hanya kandidat|submit your (cv|resume|application)|apply today|we invite you to apply|mari bergabung|bergabung(lah)? bersama kami|kami menyambut)\b/i;
 const COMPANY_BLURB =
   /\b(is a leading|is one of the|we are a|founded in|didirikan|merupakan perusahaan|adalah perusahaan|perusahaan yang bergerak|headquartered|berkantor pusat|is a fast[- ]growing|our mission|our vision|kami adalah|established in|sejak tahun)\b/i;
 const ABBREVIATIONS = new Set([
@@ -135,6 +136,12 @@ function normalizeWords(text) {
 const PHRASES = Object.fromEntries(
   Object.entries(VOCABULARY).map(([kind, list]) => [kind, list.map(normalizeWords)]),
 );
+// Duty words that make a qualifications heading "mixed", like "Tâches et compétences
+// recherchées": its list is usually the duties, so a pure requirements section wins.
+const DUTY_PHRASES = [
+  'responsibility', 'responsibilities', 'tanggung jawab', 'tugas', 'duties', 'tasks', 'tâches',
+  'job description', 'job descriptions', 'deskripsi pekerjaan', 'what you will do',
+].map(normalizeWords);
 const PHRASES_BY_FIRST_WORD = new Map();
 for (const phrase of Object.values(PHRASES).flat()) {
   const words = phrase.split(' ');
@@ -164,6 +171,12 @@ function classifyHeading(text) {
   if (best) return best.kind;
   if (/^why /.test(normalized)) return 'benefits';
   return /^(about|tentang) /.test(normalized) ? 'about' : null;
+}
+
+function isMixedHeading(text) {
+  const padded = ` ${normalizeWords(text)} `;
+  const has = (phrase) => padded.includes(` ${phrase} `);
+  return PHRASES.qualifications.some(has) && DUTY_PHRASES.some(has);
 }
 
 /** True when a plain line is nothing but vocabulary and filler words ("Job Requirements"). */
@@ -208,7 +221,12 @@ function splitBlocks(outline) {
   const open = (heading, firstLine) => {
     blocks.push(current);
     const text = heading.replace(/[:：]\s*$/, '').trim();
-    current = { heading: text, kind: classifyHeading(text), lines: firstLine ? [firstLine] : [] };
+    current = {
+      heading: text,
+      kind: classifyHeading(text),
+      mixed: isMixedHeading(text),
+      lines: firstLine ? [firstLine] : [],
+    };
   };
 
   let paragraphStart = true;
@@ -288,6 +306,11 @@ function sentences(text) {
   return out;
 }
 
+function isListLike(block) {
+  const content = block.lines.filter(Boolean);
+  return content.some((line) => line.startsWith('- ')) || (content.length >= 2 && content.every((line) => line.length <= 120));
+}
+
 /** Candidate items of a block: its list items, else its lines, else its sentences. */
 function blockItems(block) {
   const lines = block.lines.filter(Boolean);
@@ -350,11 +373,19 @@ function extractRequirements(outline, { maxItems = DEFAULT_MAX_ITEMS, maxItemCha
   const blocks = splitBlocks(outline);
   const limits = { maxItems, maxItemChars };
 
-  const qualifications = collectItems(
-    blocks.filter((block) => block.kind === 'qualifications'),
-    { ...limits, summary: false },
-  );
-  if (qualifications.length) return { heading: 'Kualifikasi', items: qualifications };
+  // A listed section beats prose ("We are looking for an engineer who..." above the real
+  // list), and a pure requirements heading beats one that also names the duties.
+  const qualificationBlocks = blocks.filter((block) => block.kind === 'qualifications');
+  const tiers = [
+    (block) => !block.mixed && isListLike(block),
+    (block) => block.mixed && isListLike(block),
+    (block) => !block.mixed && !isListLike(block),
+    (block) => block.mixed && !isListLike(block),
+  ];
+  for (const inTier of tiers) {
+    const items = collectItems(qualificationBlocks.filter(inTier), { ...limits, summary: false });
+    if (items.length) return { heading: 'Kualifikasi', items };
+  }
 
   const duties = collectItems(
     blocks.filter((block) => block.kind === 'responsibilities'),

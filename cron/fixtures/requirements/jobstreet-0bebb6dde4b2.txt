@@ -1,0 +1,16 @@
+Tanggung Jawab :
+
+- Pengembangan Mobile App (Android/iOS) dengan performa tinggi dan user-friendly.
+- Pengembangan Web berbasis modern framework.
+- Manajemen Database (SQL/NoSQL) untuk sistem berskala besar.
+- Integrasi AI Interface untuk aplikasi cerdas berbasis machine learning.
+- Berkolaborasi dengan tim desain, produk, dan QA untuk memastikan kualitas aplikasi.
+
+Kualifikasi:
+
+- Pengalaman minimal 3–5 tahun sebagai programmer.
+- Menguasai bahasa pemrograman seperti Java/Kotlin, Swift, JavaScript/TypeScript, Python.
+- Familiar dengan framework React, Angular, Flutter, atau React Native.
+- Pengalaman dalam Database Management (MySQL, PostgreSQL, MongoDB).
+- Pengetahuan tentang AI/ML API (TensorFlow, PyTorch, OpenAI API).
+- Kemampuan problem-solving dan komunikasi yang baik.

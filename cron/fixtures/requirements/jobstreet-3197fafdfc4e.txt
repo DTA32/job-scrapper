@@ -1,0 +1,19 @@
+## Requirement
+- Pendidikan Minimal S1 Teknik Informatika/Sistem Informasi/Teknik Telekomunikasi/Manajemen Informatika/Statistika/Matematika
+- Memahami pemrograman Python, Shell Script dan SQL, Query Database dan Scipting Unix, Linux
+- Paham Terkait Pandas
+- Memiliki Pengalaman kerja minimal 1 Tahun dibidang Data Analyst, Data Scienties
+- Lebih disukai Memahami Aplikasi Pentaho / Tableau dan HADOOP, Power BI
+- Paham terkait automations (SSH)
+- Dapat bekerja dalam team, Komunikatif
+- Dapat menangani tugas secara bersamaan (multitasking) dan Fast learner
+- Menguasai MS Office dengan baik
+- Bersedia berkerja overtime
+
+## Responsibilities
+- Membuat reporting daily, weekly & monthly
+- Mengerjakan hal yang berhungan dengan Database
+- Pengolahan data menggunakan SQL, Data Entry (Excel)
+- Bertanggungjawab dalam menggabunkan database
+- Pengolahan Bigdata, membuat dashboard
+- Melakukan analisa laporan & Membuat Script Query

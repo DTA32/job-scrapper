@@ -1,0 +1,106 @@
+## Job Highlights
+- Build and maintain automated testing solutions for web, mobile and API platforms
+- Work on challenging projects across fintech, travel, hospitality and consumer applications
+- Gain hands-on experience with automation frameworks, CI/CD pipelines and modern QA practices
+- Grow your technical skills and advance your career in quality engineering
+
+## Job Description
+We are looking for a hands-on QA Automation Engineer to improve the quality, reliability and release confidence of our web, mobile and backend applications.
+
+This role is primarily focused on automated testing. You will design, develop and maintain reusable automation frameworks and test scripts covering UI, API, integration and regression testing. You will also perform manual and exploratory testing where automation is not practical.
+
+The ideal candidate has practical experience writing automation scripts, integrating automated tests into CI/CD pipelines, analysing failures and working closely with development teams to prevent defects throughout the software development lifecycle.
+
+## Key Responsibilities
+- Test Automation Development
+
+- Design, develop and maintain automated test frameworks for web, mobile and API applications.
+- Create reusable, maintainable and reliable automated test scripts.
+- Automate functional, regression, smoke, integration and end-to-end test scenarios.
+- Review existing manual test cases and identify suitable candidates for automation.
+- Maintain test data, test environments and reusable automation components.
+- Investigate failed automated tests and distinguish application defects from script or environment issues.
+
+- Web and Mobile Application Testing
+
+- Automate web application testing using tools such as Selenium, Cypress or Playwright.
+- Automate mobile application testing using Maestro, Appium, Espresso, XCUITest or equivalent frameworks.
+- Develop and maintain Maestro test flows for critical user journeys, smoke testing, regression testing and end-to-end testing across iOS and Android applications.
+- Validate application behaviour across supported browsers, devices, screen sizes and operating systems.
+- Perform manual and exploratory testing for complex scenarios that cannot be effectively automated.
+
+- API and Backend Testing
+
+- Develop automated API tests using tools or frameworks such as Postman/Newman, REST Assured or equivalent.
+- Validate API requests, responses, authentication, business rules and error handling.
+- Perform database queries to verify data integrity and backend processing.
+- Test integrations between mobile applications, web applications, APIs and external systems.
+
+- CI/CD and Continuous Testing
+
+- Integrate automated test suites into CI/CD pipelines.
+- Work with developers and DevOps engineers to execute automated tests during builds, deployments and scheduled regression runs.
+- Monitor automation results and provide clear reporting on test coverage, failures and release risks.
+- Improve execution speed, stability and reliability of automated test suites.
+
+- Test Planning and Quality Assurance
+
+- Review business requirements, user stories and technical specifications to identify test scenarios.
+- Prepare and maintain test plans, test cases, test scripts and traceability records.
+- Conduct functional, regression, integration, usability and compatibility testing.
+- Support SIT, UAT, release validation and post-deployment verification.
+- Contribute to performance testing using tools such as JMeter, k6, Gatling or LoadRunner, where required.
+
+- Defect Management and Collaboration
+
+- Identify, document and track defects with clear reproduction steps, evidence, severity and business impact.
+- Work closely with developers, business analysts, project managers and DevOps engineers to resolve issues.
+- Participate in Agile activities, including sprint planning, backlog refinement, daily stand-ups and retrospectives.
+- Promote early testing and quality ownership throughout the development lifecycle.
+- Recommend improvements to test processes, automation coverage and release quality.
+
+## Requirements
+- Hands-on experience with mobile application test automation using Maestro, Appium or an equivalent framework.
+- Practical experience building and maintaining automated test scripts—not only executing scripts created by others.
+- Hands-on experience with at least one web automation framework, such as Selenium, Cypress or Playwright.
+- Experience with API testing and automation using Postman/Newman, REST Assured or equivalent tools.
+- Working knowledge of at least one programming or scripting language, such as Java, JavaScript, TypeScript, Python or C#.
+- Experience with source control tools such as Git.
+- Understanding of automation design practices, including reusable test flows, data-driven testing, test reporting and failure handling.
+
+## Preferred Qualifications
+- Strong hands-on experience creating and maintaining Maestro test flows for Flutter, iOS or Android applications.
+- Experience integrating Maestro or other automated test suites with Azure DevOps, GitHub Actions, GitLab CI, Jenkins or another CI/CD platform.
+- Experience running mobile automated tests on physical devices, emulators, simulators or cloud-based device farms.
+- Experience creating a mobile automation framework or test suite from the ground up.
+
+## What We Are Looking For
+- A technically hands-on QA professional who is comfortable writing and debugging automation code.
+- Someone who can take ownership of an automated test suite and continuously improve it.
+- A quality-focused problem solver who investigates the root cause of failures instead of only reporting symptoms.
+- A collaborative team member who can work effectively with technical and non-technical stakeholders.
+- A proactive learner who keeps up with modern testing tools and engineering practices.
+
+## Why Join Us?
+- Work on challenging and innovative web, mobile and enterprise projects.
+- Build meaningful automation that directly improves product quality and release efficiency.
+- Gain exposure to fintech, travel, hospitality and high-volume consumer platforms.
+- Collaborate with an experienced and diverse regional team.
+- Grow your skills in automation engineering, API testing, performance testing and CI/CD.
+- Enjoy a supportive and dynamic working environment.
+
+If you are passionate about test automation and enjoy building reliable testing solutions, we invite you to apply and grow with our team.
+
+Job Type: Full-time
+
+Application Question(s):
+
+- How many years of hands-on experience do you have writing and maintaining automated test scripts?
+- Which automation tools have you personally used? Please state the tools, application types and duration of use. Examples: Maestro, Appium, Selenium, Cypress, Playwright, Postman/Newman or REST Assured.
+- Have you personally created automated test flows for an iOS, Android or Flutter application using Maestro, Appium or another mobile automation framework? If yes, briefly describe what you automated.
+- Briefly describe one recent automation project. What did you personally develop, which tools did you use, and was the test suite integrated into a CI/CD pipeline?
+- Are you willing to complete a short practical assessment involving the creation or troubleshooting of automated test scripts?
+- When will you be available to start work, and what is your current notice period?
+- What is your expected monthly salary in IDR, and do you have any other expectations for your next job?
+
+Work Location: Remote

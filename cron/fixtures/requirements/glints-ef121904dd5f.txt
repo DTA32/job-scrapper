@@ -1,0 +1,42 @@
+Kami mencari Fullstack Engineer (Tidak sedang studi / perkuliahan ) bermental eksekutor untuk membangun sistem ERP kompleks (dari nol hingga production). Kami tidak butuh engineer yang hanya jago teori . kami butuh kecepatan, intuisi teknis tajam, dan hasil nyata.
+
+## Tanggung Jawab Utama
+- End-to-End Development: Bangun sistem menyeluruh (Frontend, Backend, Database ) untuk aplikasi berbasis workflow (ERP).
+- Mental Eksekutor : Memiliki ownership tinggi terhadap output yang di kerjakan
+- Integrasi AI & Arsitektur: Terjemahkan business logic rumit, desain RESTful API, dan integrasikan fitur AI (LLM / Automation).
+- Keamanan & Performa: Terapkan standar secure coding (OWASP), Melakukan code review, debugging, performance tuning dan kelola Git/CI-CD pipeline secara efisien.
+- Reliability : Menjamin scalability, performance, dan reliability sistem di tahap produksi.
+- Cara kerja : Berbasis task. Evaluasi murni dari kualitas deliverable, bukan jam duduk
+
+## Kualifikasi Wajib
+- Min. SMA / SMK (Tidak sedang studi / perkuliahan )
+- Memiliki ownership & accountability tinggi
+- Pengalaman > 2th sebagai Fullstack Engineer / Software Developer
+- Penguasaan kuat pada frontend & backend development
+- Wajib melampirkan portofolio nyata
+- Tech Stack: Vue / React (Frontend), Python / Express (Backend), PostgreSQL / MySQL / Non-SQL (Database).
+- Paham konsep dan implementasi nyata :
+
+- REST API & Event-Driven
+- Microservices / Clean Architecture, Auth (JWT/RBAC), dan Version Control.
+
+- Pengalaman membangun dengan business logic (ERP / workflow system) hingga production-grade system
+- Mampu menulis kode yang clean, scalable, dan testable
+- Punya insting problem-solving cepat saat sistem bermasalah.
+
+## Nilai Tambah (Highly Preferred)
+Pengalaman membuat sistem berskala Enterprise / ERP / SaaS.
+
+Familiar dengan infrastruktur Cloud (GCP), Docker, Kubernetes, dan sistem Observability (monitoring).
+
+## Benefit
+- Fasilitas Mess
+- Jenjang karir / Promosi Jabatan jelas & Potensi kerja sama jangka panjang
+- Rate kompetitif sesuai pengalaman & kontribusi
+- Bonus Proyek
+
+## Confidentiality Note
+Detail arsitektur sistem, flow bisnis, dan aspek teknis spesifik akan dibahas pada tahap lanjutan (interview) dan wajib tunduk pada perjanjian kerahasiaan (NDA).
+
+## Notes
+Posisi ini menuntut kecepatan eksekusi dan intuisi teknis yang tajam. Hanya diperuntukkan bagi mereka yang serius berkomitmen jangka panjang untuk memberikan hasil nyata. Jika Anda terbiasa disuapi instruksi rinci atau lambat dalam mengambil keputusan teknis, jangan melamar. Kami butuh eksekutor mandiri.

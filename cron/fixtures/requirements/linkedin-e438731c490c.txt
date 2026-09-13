@@ -1,0 +1,55 @@
+## Make an impact with NTT DATA
+Join a company that is pushing the boundaries of what is possible. We are renowned for our technical excellence and leading innovations, and for making a difference to our clients and society. Our workplace embraces diversity and inclusion – it’s a place where you can grow, belong and thrive.
+
+## Your day at NTT DATA
+The Senior Associate Software Applications Development Engineer is a developing subject matter expert, responsible for developing new applications and improving upon existing applications based on the needs of the internal organization and / or external clients.
+
+## What You'll Be Doing
+
+## Key Responsibilities
+- Develops applications that effectively accomplish client objectives and user needs.
+- Designs and writes code for applications and maintain applications databases.
+- Analyzes and edits existing software applications to improve and optimize functionality, fix problems, and enable their use on new hardware platforms.
+- Remodels and adapts applications as needed to optimize performance.
+- Identifies specific client needs and preferences related to the application.
+- Tests applications extensively to ensure they are error and bug-free.
+- Installs applications and acts as technical advisor.
+- Communicates with relevant internal technical stakeholders to obtain information on project limitations, performance requirements, and interfaces.
+- Consults with clients in the design phase to determine client needs.
+- Produces software documentation following company software process and templates.
+- Participates in software product review meetings and team meetings.
+- Performs any other related tasks as required.
+
+## Knowledge and Attributes
+- Developing understanding of computer science, with specific knowledge of computer programming, application design, and user-focused features.
+- Good team player who maintains the integrity of the team.
+- Excellent attention to detail capabilities.
+- Ability to understand and analyze systems.
+- Proficiency in writing software using the Java Programming Language and a standard object library.
+- Knowledge of software development process.
+- Proficiency with agile development such as Scrum.
+- Knowledge of software integrated development environments.
+- Knowledge in various programming languages such as (but not limited to) Java, Perl, Python, C++.
+- Demonstrated analytical, organizational, and project management skills, using relevant information to make timely and critical decisions that affect cross-functional teams.
+- Ability to handle client and customer issues tactfully and professionally.
+
+## Academic Qualifications and Certifications
+- Bachelor's degree or equivalent in computer science or software engineering or related field.
+- Certification in various programming languages, for example (but not limited to) Java, Perl, Python, C++ preferred.
+- Scrum / Project Management certification preferred.
+
+## Required Experience
+- Moderate level Software Applications Engineering, Software Development experience, or related work experience
+- Moderate level experience with Programming Languages such as C, C++, Java, Python, etc.
+- Moderate level experienced with Linux or Unix and Windows operating systems
+- Moderate level experience working with SQL
+- Moderate level project management experience and/or experience working in an Agile environment
+
+## Workplace type
+On-site Working
+
+## About NTT DATA
+NTT DATA is a $30+ billion trusted global innovator of business and technology services. We serve 75% of the Fortune Global 100 and are committed to helping clients innovate, optimize and transform for long-term success. We invest over $3.6 billion each year in R&D to help organizations and society move confidently and sustainably into the digital future. As a Global Top Employer, we have diverse experts in more than 50 countries and a robust partner ecosystem of established and start-up companies. Our services include business and technology consulting, data and artificial intelligence, industry solutions, as well as the development, implementation and management of applications, infrastructure, and connectivity. We are also one of the leading providers of digital and AI infrastructure in the world. NTT DATA is part of NTT Group and headquartered in Tokyo.
+
+## Equal Opportunity Employer
+NTT DATA is proud to be an Equal Opportunity Employer with a global culture that embraces diversity. We are committed to providing an environment free of unfair discrimination and harassment. We do not discriminate based on age, race, colour, gender, sexual orientation, religion, nationality, disability, pregnancy, marital status, veteran status, or any other protected category. Join our growing global team and accelerate your career with us. Apply today.

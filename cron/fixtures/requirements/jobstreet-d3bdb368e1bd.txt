@@ -1,0 +1,43 @@
+## Company Description
+
+## About Grab and Our Workplace
+Grab is Southeast Asia's leading superapp. From getting your favourite meals delivered to helping you manage your finances and getting around town hassle-free, we've got your back with everything. In Grab, purpose gives us joy and habits build excellence, while harnessing the power of Technology and AI to deliver the mission of driving Southeast Asia forward by economically empowering everyone, with heart, hunger, honour, and humility.
+
+## Job Description
+
+## Get to Know the Team
+We're looking for a Senior Backend Engineer to join our Business Platform team in Jakarta, Indonesia. The Business Platform powers the backend capabilities that enable businesses and enterprises to onboard, operate, grow, and serve consumers at scale across Southeast Asia.
+
+## Get to Know the Role
+In this role, you will design, build, and evolve backend platform services that manage business profiles, store metadata, business configuration, and related operational workflows. You'll work on systems that sit close to the source of truth for business data and workflows—systems that directly influence how businesses set up their operations, how internal teams operate reliably, and how downstream products consume trusted business information. The ideal candidate will demonstrate strong ownership, system design thinking, and a commitment to building platforms that simplify complexity rather than spread it around. This is an onsite role based in Jakarta.
+
+## The Critical Tasks You Will Perform
+- Lead the architectural design of microservices, high-throughput APIs, and data storage solutions built to handle scale and high availability.
+- Diagnose high-stakes performance bottlenecks, refactor core infrastructure, and ensure low latency across distributed systems.
+- Own end-to-end delivery of mission-critical systems—from writing technical design documents (TDDs) and scoping projects to deploying and maintaining production features.
+- Drive code quality across the team through high-bar code reviews, system reliability standards, and technical mentorship of mid/junior engineers.
+- Oversee cloud infrastructure (AWS/GCP/Azure), automated CI/CD pipelines, security protocols, and robust incident management/observability to guarantee strict SLAs.
+
+## Qualifications
+
+## What Essential Skills You Will Need
+- 5+ years in backend/platform engineering with high-scale production systems.
+- Strong proficiency in Go, Java, or Kotlin.
+- Deep knowledge of distributed systems, service-oriented architecture, microservices, APIs, data modeling, and eventual consistency.
+- Tech Stack: Cloud (AWS/GCP/Azure), containerization (Docker/Kubernetes), CI/CD pipelines, caching, and observability.
+- Data & Messaging: SQL/NoSQL databases, event-driven architectures, and messaging systems (Kafka/RabbitMQ).
+- Core Competencies: Strong problem-solving and communication skills; version control (Git) proficiency. SaaS or e-commerce domain experience, mentoring junior engineers.
+
+## Additional Information
+
+## Life at Grab
+We care about your well-being at Grab, here are some of the global benefits we offer:
+
+- We have your back with Term Life Insurance and comprehensive Medical Insurance.
+- With GrabFlex, create a benefits package that suits your needs and aspirations.
+- Celebrate moments that matter in life with loved ones through Parental and Birthday leave, and give back to your communities through Love-all-Serve-all (LASA) volunteering leave
+- We have a confidential Grabber Assistance Programme to guide and uplift you and your loved ones through life's challenges.
+- Balancing personal commitments and life's demands are made easier with our FlexWork arrangements such as differentiated hours
+
+## What We Stand For At Grab
+We are committed to building an inclusive and equitable workplace that provides equal opportunity for Grabbers to grow and perform at their best. We consider all candidates fairly and equally regardless of nationality, ethnicity, race, religion, age, gender, family commitments, physical and mental impairments or disabilities, and other attributes that make them unique.

@@ -1,0 +1,19 @@
+## About the role
+Fullstack Software Engineer role based in Jakarta, responsible for building secure, testable, and scalable applications and services.
+
+## Key responsibilities
+- Build secure, testable, and scalable REST-API
+- Bugfix, create new feature and maintain existing application/service
+- Database and application server maintenance
+- Support each other for technical or recommendation
+
+## About you
+- Minimum of 5 years of experience in fullstack software engineer
+- Strong problem-solving skills and attention to detail
+- Excellent communication and teamwork skills
+- Ability to work in a fast-paced, dynamic environment
+- Fluent in nodejs environment programming language and experienced in other programming language such as Python, Javascript, or PHP
+- Fluent in full-stack framework development using React, Nextjs, or vue
+- Strong knowledge in RDBMS Database (Mysql/Mariadb, PostgreSQL, etc)
+- Good knowledge in code development management using Git
+- Experienced in unix/linux development environment

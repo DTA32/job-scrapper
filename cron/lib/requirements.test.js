@@ -36,6 +36,8 @@ test('headings seen in live descriptions classify as expected', () => {
     'This role is not for': 'info',
     'Get to know the team': 'about',
     'Our Operating Principles': 'about',
+    'Mandatory Belongings That You Must Prepare': 'qualifications',
+    'To thrive in this role, you need to have': 'qualifications',
   };
   for (const [heading, kind] of Object.entries(expected)) assert.equal(classifyHeading(heading), kind, heading);
 });
@@ -54,6 +56,18 @@ test('a prose paragraph that opens like a qualifications section counts as one',
     'Kualifikasi',
     ['Kami mencari kandidat yang memiliki gelar S1 dan pengalaman 1 hingga 3 tahun.', 'Kandidat harus menguasai Redis.'],
   ]);
+});
+
+test('a listed requirements section beats a prose intro under a qualifications heading', () => {
+  const outline =
+    "## What We're Looking For\nWe are looking for an AI Engineer who can ship LLM systems.\n\n## Requirements\n- 2+ years of Python\n- RAG experience";
+  assert.deepEqual(items(outline), ['Kualifikasi', ['2+ years of Python', 'RAG experience']]);
+});
+
+test('a pure requirements section beats a heading that also names the duties', () => {
+  const outline =
+    '## Tâches et compétences recherchées\n- Concevoir des composants\n\nExigences\n\n- Connaissance des principes agile\n- Expérience COBOL';
+  assert.deepEqual(items(outline), ['Kualifikasi', ['Connaissance des principes agile', 'Expérience COBOL']]);
 });
 
 test('a qualifications section wins over duties that come first', () => {

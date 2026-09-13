@@ -1,0 +1,23 @@
+## Why Voca
+Voca is a leading gaming commerce and digital payments platform, connecting gamers, publishers, and partners across SEA through seamless payment, distribution, and monetization solutions. Our platform powers digital transactions for game top-ups, vouchers, prepaid products, digital goods, and other online services, serving millions of users across the region. As we continue to grow, we're building scalable technology and expanding our ecosystem to support the next generation of gaming and digital commerce. At Voca, we believe great products are built by great people. Our culture is rooted in ownership, collaboration, continuous learning, and a shared passion for solving meaningful problems. If you're looking to build products that reach millions of users and work alongside talented people who care deeply about their craft, we'd love to meet you.
+
+## The Opportunity
+We are looking for an experienced Product Manager to join our growing team and support the development of VocaGame. In this role, you will be responsible for designing, developing, and overseeing the performance, reliability, and scalability of our systems. You will work closely with cross-functional teams to deliver innovative solutions that drive user satisfaction and enhance the overall user experience.
+
+## Key Responsibilities
+- Define and own the product roadmap for VocaGame.
+- Collaborate with cross-functional teams to deliver seamless payment solutions.
+- Analyze customer feedback, market trends, and competitive insights to identify new opportunities.
+- Translate business requirements into detailed product specifications and user stories.
+- Drive end-to-end product development lifecycle, from ideation to launch and beyond.
+
+## Qualifications
+- At least 4 years of product management experience delivering highly successful and innovative B2B products with stellar design taste and product instincts. Experience in payments and operations/reporting is a must.
+- Proven experience as a Product Manager, preferably in the payment or fintech industry.
+- Ability to break down complex problems, and identify use cases and solutions while working in an unstructured environment
+- Strong understanding of payment gateways, APIs, and digital payment ecosystems.
+- Exceptional analytical and problem-solving skills with a data-driven approach.
+- Excellent communication and stakeholder management abilities.
+- Familiarity with Agile methodologies and tools (e.g., Jira, Confluence).
+- Ability to prioritize tasks in a fast-paced, dynamic environment.
+- Experience with regulatory and compliance requirements for payment systems is a plus.

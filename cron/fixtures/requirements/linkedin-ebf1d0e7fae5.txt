@@ -1,0 +1,16 @@
+We think you also hate when travel app is giving you a headache, right? A slight misinformation can ruin the trip.
+
+That is exactly what we are tackling as t-fam! Making sure that our 50+ million users have the best experience in crafting their own adventure.
+
+## Main Requirement
+- Review and validate data analytic to be used for decision making
+- Gathering requirements and scoping for reporting and analytic
+- Deliver analysis, insights, reporting, data marts, and tools to support the business team
+- Explore various datasets to generate insights, conclusions and recommendations
+- Build & maintain data mart and dashboards for tracking business OKR and initiatives
+- Identify product or business opportunities and support growth with experimentations and recommendations
+- Owns Tech solutioning of products for new requirements. Gets good understanding of business use cases, its impact, long term goals, short term goals and solves it keeping view of these aspects
+- Be the mentor and coach the junior team members on practical solution regarding dashboards and analytical methods and approaches
+- Experience with AI tools - Claude, Chatgpt
+
+In the event that you haven’t received any updates after 3 weeks, your data will be kept and we may contact you for another career destination. Meanwhile, discover more about tiket.com on Instagram, LinkedIn, or YouTube.

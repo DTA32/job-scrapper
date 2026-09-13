@@ -1,0 +1,13 @@
+## Job Overview
+We are looking for a Data Analyst who can turn numbers and raw data into meaningful information and actionable insights. The role involves discovering patterns, identifying business opportunities, and helping stakeholders make better data-driven decisions.
+
+## Qualifications
+- Bachelor’s degree (S1) in Statistics, Mathematics, Computer Science, Information Systems, Business, or a related field.
+- Minimum 1 year of experience as a Data Analyst or in a related analytical role.
+- Strong proficiency in Microsoft Excel and SQL.
+- Experience with Business Intelligence (BI) tools; Metabase is highly preferred.
+- Curious and genuinely interested in working with numbers and data
+- Strong analytical and problem-solving skills, with the ability to translate data into meaningful business insights.
+- Detail-oriented, with strong critical thinking and logical reasoning skills.
+- Able to work independently as well as collaboratively within a team.
+- Strong verbal and written communication skills, with the ability to clearly communicate analytical findings to both technical and non-technical stakeholders.

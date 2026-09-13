@@ -1,0 +1,19 @@
+Requirements :
+
+- Bachelor Degree in Computer Science / Information Technology.
+- Minimal 3 years of working experience as Server Engineer.
+- Ability to manage and configure VMware is a must
+- Experience Linux Server and Windows Server.
+- Experience installation HPE, IBM, Dell (server and storage).
+- Good analytical Thinking.
+- Good command of English
+- Able to join ASAP
+
+Job Descriptions :
+
+- Perform installation, implementation and configuration server and storage.
+- Perform maintenance support and troubleshooting for Server Hardware, Server OS (Linux, Windows, VMWare) and Storage.
+- Review Server log and investigate anomalies.
+- Manage veritas netbackup client
+- Monitor all system servers and storage, including the VMware cluster
+- Once a month, replace the tape backup cartridge at the customer’s data center
