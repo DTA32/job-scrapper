@@ -23,6 +23,7 @@ from scraper.config import ACCEPT_LANGUAGE, USER_AGENT
 from scraper.config_loader import AppConfig, ConfigError, keyword_slug, load
 from scraper.log import get_logger as _get_logger
 from scraper.runner import run as run_scraper
+from scraper.sites._text import OUTLINE_FORMAT
 from scraper.types import JOB_FIELD_ORDER
 
 DEFAULT_CONFIG_PATH = Path(os.environ.get("SCRAPER_CONFIG", "config.yaml"))
@@ -782,6 +783,7 @@ def scrape_jobs(
                     "requested_sites": target_sites,
                     "errors": errors,
                     "per_site_counts": _build_per_site_counts(results),
+                    "requirements_format": OUTLINE_FORMAT,
                 },
                 "filtered_results": filtered_results,
                 "raw_results": raw_results,

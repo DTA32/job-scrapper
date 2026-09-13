@@ -20,6 +20,11 @@ import re
 
 from bs4 import BeautifulSoup, Comment, NavigableString, Tag
 
+# Recorded on every run document whose `requirements` come from this module, so tools
+# reading stored runs can tell outline text from the older flattened or 600-char
+# window text (seeds/requirement_samples.runner.js harvests only these runs).
+OUTLINE_FORMAT = "outline-v1"
+
 # Control characters marking structure inside the parsed tree. Input is stripped of
 # control characters first, so they cannot collide with real text.
 _HEAD = "\x01"

@@ -218,6 +218,7 @@ def test_scrape_jobs_returns_mongo_id_and_builds_document(
     assert doc["filtered_results"][0]["payload"]["count"] == 2  # cut-down list
     assert doc["run_metadata"]["per_site_counts"] == {"jobstreet": {"data analyst": 2}}
     assert "raw_results" not in doc["run_metadata"]  # not nested
+    assert doc["run_metadata"]["requirements_format"] == "outline-v1"  # harvestable
     assert doc["note"] is None  # no errors → no note
 
 
