@@ -4,9 +4,10 @@ set -euo pipefail
 # Start the dev environment (no proxy, config merged from config.yaml + config.dev.patch.yaml).
 #
 # Usage:
-#   ./scripts/run_dev.sh           # both mcp + bot
-#   ./scripts/run_dev.sh mcp       # MCP server only
-#   ./scripts/run_dev.sh bot       # bot only
+#   ./scripts/run_dev.sh           # MCP stack (mongo + scraper-mcp)
+#   ./scripts/run_dev.sh mcp       # same
+#
+# The bot is not a compose service: run it once with scripts/run_bot_once.sh.
 
 # --- config ---
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -30,11 +31,13 @@ yq eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' \
 
 # --- resolve profiles ---
 case "$ARG" in
-  mcp)  PROFILES="--profile mcp" ;;
-  bot)  PROFILES="--profile bot" ;;
-  all)  PROFILES="--profile mcp --profile bot" ;;
+  mcp|all) PROFILES="--profile mcp" ;;
+  bot)
+    echo "The bot is not a compose service any more; run it once with scripts/run_bot_once.sh." >&2
+    exit 1
+    ;;
   *)
-    echo "Usage: $0 [mcp|bot]" >&2
+    echo "Usage: $0 [mcp]" >&2
     exit 1
     ;;
 esac

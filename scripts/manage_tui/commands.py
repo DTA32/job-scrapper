@@ -20,13 +20,15 @@ ACTIONS = ("start", "stop", "status", "logs")
 ALL = "all"
 LOG_TAIL = "200"
 
-# Dev smoke tests: each is one `docker exec` against an already-running
-# container (started via the profile Start buttons). The keys are the button
-# ids and the preview/run wiring in app.py iterates this tuple.
+# Dev smoke tests. scrape/mongo `docker exec` into the running scraper-mcp
+# container (started via the profile Start buttons); cron/discord build the bot
+# image from Dockerfile.bot and run it once through scripts/run_bot_once.sh. The
+# keys are the button ids and the preview/run wiring in app.py iterates this tuple.
 TESTS = ("scrape", "mongo", "cron", "discord")
 
 _MCP_CONTAINER = CONTAINER_NAMES["scraper-mcp"]
-_BOT_CONTAINER = CONTAINER_NAMES["bot"]
+# Builds Dockerfile.bot and runs it once; reads DISCORD_WEBHOOK_URL etc. from .env.
+_BOT_ONCE = ["bash", "scripts/run_bot_once.sh"]
 
 # Reuses the real Mongo connection/auth (mcp_server.mongo, MONGO_URI from the
 # container env) but writes to an isolated throwaway collection so the real
@@ -165,9 +167,10 @@ def build_test(test: str) -> list[Command]:
     """One docker-exec Command per dev smoke test.
 
     Mirrors build_sequence: the UI previews Command.preview() and the runner
-    executes Command.argv, so preview == exec holds here too. Each test runs
-    against an already-running container — it does not start or tear down a
-    stack. scrape/mongo need scraper-mcp up; cron/discord need bot up.
+    executes Command.argv, so preview == exec holds here too. No test starts or
+    tears down a stack: scrape/mongo run inside the running scraper-mcp container,
+    and cron/discord run the Dockerfile.bot image once (cron also needs
+    scraper-mcp up).
 
     The runner uses create_subprocess_exec (argv, no shell), so the multi-line
     python -c / node -e bodies pass as a single argv element with no escaping.
@@ -179,34 +182,13 @@ def build_test(test: str) -> list[Command]:
     if test == "mongo":
         return [Command(["docker", "exec", _MCP_CONTAINER, "python", "-c", _MONGO_PING_SCRIPT])]
     if test == "cron":
-        # Same one-shot as scripts/test_cron_dev.sh: fires the full cron job
-        # (real scrape + real Discord posts) once inside the bot container.
-        return [
-            Command(
-                [
-                    "docker",
-                    "exec",
-                    _BOT_CONTAINER,
-                    "/bin/sh",
-                    "/workspace/scraper-bot/cron/run-scraper.sh",
-                ]
-            )
-        ]
+        # Same one-shot as scripts/test_cron_dev.sh: the full digest run (real
+        # scrape + real Discord post) in a throwaway Dockerfile.bot container.
+        return [Command([*_BOT_ONCE])]
     if test == "discord":
-        # DISCORD_WEBHOOK_URL already lives in the bot container env; the digest
-        # file and summary are built inside the container by the snippet.
-        return [
-            Command(
-                [
-                    "docker",
-                    "exec",
-                    _BOT_CONTAINER,
-                    "/bin/sh",
-                    "-c",
-                    _DISCORD_SEND_SH,
-                ]
-            )
-        ]
+        # The snippet builds the digest file and summary inside that throwaway
+        # container; run_bot_once.sh passes DISCORD_WEBHOOK_URL in from .env.
+        return [Command([*_BOT_ONCE, "/bin/sh", "-c", _DISCORD_SEND_SH])]
     raise ValueError(f"unknown test: {test!r}")
 
 

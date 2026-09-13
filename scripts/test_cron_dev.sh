@@ -3,8 +3,8 @@ set -euo pipefail
 
 # One-shot dev test of the scrape → Discord post flow using the dev config overlay.
 # Merges config.yaml + config.dev.patch.yaml, starts mongo + scraper-mcp via the
-# dev compose stack, then fires cron/run-scraper.sh directly inside a fresh bot
-# container. Tears down the MCP stack on exit.
+# dev compose stack, then runs the bot image (Dockerfile.bot) once via
+# scripts/run_bot_once.sh. Tears down the MCP stack on exit if it started it.
 #
 # Requires:
 #   .env                - must contain DISCORD_WEBHOOK_URL,
@@ -114,8 +114,8 @@ if [ "$MCP_READY" = false ]; then
 fi
 echo "==> MCP is up."
 
-# --- fire cron/run-scraper.sh in the running bot container ---
-echo "==> Running cron/run-scraper.sh in job-scraper-bot..."
-docker exec job-scraper-bot /bin/sh /workspace/scraper-bot/cron/run-scraper.sh
+# --- run the bot image once against the dev MCP stack ---
+echo "==> Running the bot once (Dockerfile.bot)..."
+"$REPO_ROOT/scripts/run_bot_once.sh"
 
 echo "==> Done. Dev MCP stack will be torn down by trap."

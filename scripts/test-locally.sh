@@ -3,7 +3,7 @@ set -euo pipefail
 
 # One-shot local test of the scrape → Discord post flow.
 # Starts the mcp-profile stack (mongo + scraper-mcp) via docker compose,
-# then fires `cron/run-scraper.sh` directly inside a one-shot bot container.
+# then runs the bot image (Dockerfile.bot) once via scripts/run_bot_once.sh.
 # Requires:
 #
 #   DISCORD_WEBHOOK_URL - Discord webhook URL to post into
@@ -41,8 +41,8 @@ cleanup() {
 }
 trap cleanup EXIT
 
-echo "==> Building images..."
-docker compose -f "$COMPOSE_BASE" -f "$COMPOSE_ENV" build scraper-mcp bot
+echo "==> Building scraper-mcp..."
+docker compose -f "$COMPOSE_BASE" -f "$COMPOSE_ENV" build scraper-mcp
 
 echo "==> Starting MCP stack (mongo + scraper-mcp)..."
 docker compose -f "$COMPOSE_BASE" -f "$COMPOSE_ENV" --profile mcp up -d
@@ -65,9 +65,7 @@ for i in $(seq 1 20); do
 done
 echo "==> MCP is up."
 
-echo "==> Firing bot one-shot (skipping supercronic, running run-scraper.sh directly)..."
-docker compose -f "$COMPOSE_BASE" -f "$COMPOSE_ENV" run --rm \
-  --entrypoint /bin/bash \
-  bot /workspace/scraper-bot/cron/run-scraper.sh
+echo "==> Running the bot once (Dockerfile.bot)..."
+"$REPO_ROOT/scripts/run_bot_once.sh"
 
 echo "==> Done. MCP stack will be stopped by trap."

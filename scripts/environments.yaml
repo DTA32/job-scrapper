@@ -1,7 +1,7 @@
 # Environments for the Docker manager TUI (scripts/manage.py).
 #
 # Add a new environment = add a block under `environments`. No Python changes needed.
-# Profiles (mcp / mongo / bot) are read from the compose files themselves, NOT here,
+# Profiles (mcp / mongo) are read from the compose files themselves, NOT here,
 # so they stay a single source of truth.
 #
 # Per-environment keys:

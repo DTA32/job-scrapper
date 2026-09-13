@@ -34,7 +34,7 @@ _SUMMARY_ENV_KEYS = (
 _PREVIEW_HINT = "(focus an action — Tab/arrows — to preview its command)"
 
 # Test button labels. Keys must match commands.TESTS; ids are f"test-{key}".
-# scrape/mongo run against scraper-mcp; cron/discord run against bot.
+# scrape/mongo run inside scraper-mcp; cron/discord run the Dockerfile.bot image once.
 _TEST_LABELS = {
     "scrape": "Scrape",
     "mongo": "Mongo",
@@ -257,8 +257,6 @@ class ManagerApp(App):
         return rows
 
     def _row_label(self, scope: str) -> str:
-        if scope == "bot" and self.env.config_merge is not None:
-            return "bot (idles in dev)"
         return scope
 
     @staticmethod

@@ -5,9 +5,10 @@ set -euo pipefail
 # Requires a SOCKS5 proxy running on host port 1080.
 #
 # Usage:
-#   ./scripts/run_prod.sh           # both mcp + bot
-#   ./scripts/run_prod.sh mcp       # MCP server only
-#   ./scripts/run_prod.sh bot       # bot only
+#   ./scripts/run_prod.sh           # MCP stack (mongo + scraper-mcp)
+#   ./scripts/run_prod.sh mcp       # same
+#
+# The bot is not a compose service: run it once with scripts/run_bot_once.sh.
 
 # --- config ---
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -25,11 +26,13 @@ fi
 
 # --- resolve profiles ---
 case "$ARG" in
-  mcp)  PROFILES="--profile mcp" ;;
-  bot)  PROFILES="--profile bot" ;;
-  all)  PROFILES="--profile mcp --profile bot" ;;
+  mcp|all) PROFILES="--profile mcp" ;;
+  bot)
+    echo "The bot is not a compose service any more; run it once with scripts/run_bot_once.sh." >&2
+    exit 1
+    ;;
   *)
-    echo "Usage: $0 [mcp|bot]" >&2
+    echo "Usage: $0 [mcp]" >&2
     exit 1
     ;;
 esac

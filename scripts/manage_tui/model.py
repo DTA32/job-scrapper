@@ -23,7 +23,6 @@ MCP_PORT = 8080
 CONTAINER_NAMES = {
     "scraper-mcp": "job-scraper-mcp",
     "mongo": "job-scraper-mongo",
-    "bot": "job-scraper-bot",
     "output-init": "job-scraper-init",
 }
 
