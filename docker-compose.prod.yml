@@ -8,7 +8,3 @@ services:
     network_mode: host
     environment:
       - MONGO_URI=mongodb://${MONGO_ROOT_USER:-admin}:${MONGO_ROOT_PASSWORD}@localhost:27017
-
-  # override: use pre-built image from ghcr.io
-  bot:
-    image: ${BOT_IMAGE:-job-scraper-bot:latest}

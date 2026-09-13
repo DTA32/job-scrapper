@@ -1,13 +1,5 @@
 services:
 
-  # Delete this to activate the cron schedule job.
-  # Also mounts full config (base removed it; dev needs it, prod uses image-baked config).
-  bot:
-    entrypoint: ["sleep"]
-    command: ["infinity"]
-    volumes:
-      - ./config.yaml:/workspace/config.yaml:ro
-
   # override: mount merged dev config
   scraper-mcp:
     volumes:

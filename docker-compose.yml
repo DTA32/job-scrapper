@@ -81,33 +81,5 @@ services:
       - MONGO_DB_NAME=${MONGO_DB_NAME:-job_scraper}
       - MONGO_COLLECTION_NAME=${MONGO_COLLECTION_NAME:-scrape_runs}
 
-  # SERVICE: bot — cron bot; runs the digest pipeline (cron/run-digest.js) on a schedule; profile-gated so `docker compose up` skips it by default
-  bot:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: bot
-    image: job-scraper-bot:latest
-    container_name: job-scraper-bot
-    restart: unless-stopped
-    profiles: ["bot"]
-    extra_hosts:
-      - "host.docker.internal:host-gateway" # allows bot to reach scraper-mcp via host.docker.internal:8080 (Linux only)
-    depends_on:
-      output-init:
-        condition: service_completed_successfully
-    environment:
-      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
-      - MCP_URL=${MCP_URL:-http://host.docker.internal:8080/mcp}
-      - SCRAPE_TIMEOUT_MS=${SCRAPE_TIMEOUT_MS:-1800000}
-      - MAX_CHARS=${MAX_CHARS:-1900}
-      - MAX_FILE_BYTES=${MAX_FILE_BYTES:-10485760}
-      - REQ_MAX_ITEMS=${REQ_MAX_ITEMS:-5}
-      - REQ_MAX_ITEM_CHARS=${REQ_MAX_ITEM_CHARS:-80}
-      - BOT_VERSION=${BOT_VERSION:-}
-      - TZ=${TZ:-Asia/Jakarta}
-    volumes:
-      - ./output:/workspace/output
-
 volumes:
   mongo-data:

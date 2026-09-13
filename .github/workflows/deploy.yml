@@ -50,7 +50,8 @@ jobs:
             ${{ steps.tags.outputs.latest }}
             ${{ steps.tags.outputs.sha }}
 
-  # 2. Test the bot (node --test), then build its Docker image and push to ghcr.io
+  # 2. Test the bot (node --test in cron/). Its image is built from Dockerfile.bot for
+  #    the k8s CronJob, outside this workflow (k8s/README.md).
   test-bot:
     runs-on: ubuntu-latest
     steps:
@@ -65,49 +66,6 @@ jobs:
       - name: Install and test
         working-directory: cron
         run: npm ci --no-audit --no-fund && npm test
-
-  build-bot:
-    needs: test-bot
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    outputs:
-      image_tag_sha: ${{ steps.tags.outputs.sha }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set image tags
-        id: tags
-        run: |
-          # ghcr.io requires lowercase; github.repository may contain uppercase chars
-          REPO_LOWER=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')
-          # rolling tag — always points to the newest build
-          echo "latest=ghcr.io/${REPO_LOWER}:bot-latest" >> "$GITHUB_OUTPUT"
-          # immutable tag pinned to this exact commit, used for deployment
-          echo "sha=ghcr.io/${REPO_LOWER}:bot-${{ github.sha }}" >> "$GITHUB_OUTPUT"
-
-      - name: Login to ghcr.io
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build & push bot image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          target: bot
-          push: true
-          cache-from: type=gha,scope=bot
-          cache-to: type=gha,mode=max,scope=bot
-          tags: |
-            ${{ steps.tags.outputs.latest }}
-            ${{ steps.tags.outputs.sha }}
 
   # 3. SSH into VPS → pull new MCP image → restart container (runs after build-mcp)
   deploy-mcp:
@@ -157,51 +115,3 @@ jobs:
           MONGO_ROOT_PASSWORD: ${{ secrets.MONGO_ROOT_PASSWORD }}
           MONGO_DB_NAME: ${{ vars.MONGO_DB_NAME || 'job_scraper' }}
           MONGO_COLLECTION_NAME: ${{ vars.MONGO_COLLECTION_NAME || 'scrape_runs' }}
-
-  # 4. SSH into VPS → pull new bot image → restart container (runs after build-bot + deploy-mcp)
-  deploy-bot:
-    needs: [build-bot, deploy-mcp]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Ensure deploy dir
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: mkdir -p ~/job-scrapper
-
-      - name: Copy compose files
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "docker-compose.yml,docker-compose.prod.yml"
-          target: "~/job-scrapper"
-
-      - name: Deploy scraper-bot
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          envs: BOT_IMAGE,DISCORD_BOT_TOKEN,DISCORD_CHANNEL_ID,TZ
-          script: |
-            set -euo pipefail
-            cd ~/job-scrapper
-
-            # one-time migration: remove legacy docker run container (different name)
-            docker rm -f scraper-bot 2>/dev/null || true
-
-            C="docker compose -f docker-compose.yml -f docker-compose.prod.yml"
-            $C --profile bot pull
-            $C --profile bot up -d --no-build
-            $C ps
-        env:
-          BOT_IMAGE: ${{ needs.build-bot.outputs.image_tag_sha }}
-          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
-          DISCORD_CHANNEL_ID: ${{ secrets.DISCORD_CHANNEL_ID }}
-          TZ: ${{ vars.TZ || 'Asia/Jakarta' }}
