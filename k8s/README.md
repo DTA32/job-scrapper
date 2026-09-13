@@ -91,10 +91,10 @@ curl -s localhost:8080/health
 
 ## Notes
 
-- **CI later.** `.github/workflows/deploy.yml` (the old VPS/compose pipeline) is
-  intentionally left untouched. When wiring up a new CI, have it perform the same
-  three steps as *Deploy* above: build+push both images, `sed` the tag into each
-  manifest, `kubectl apply`.
+- **CI later.** `.github/workflows/deploy.yml` (the old VPS/compose pipeline) only
+  builds and deploys scraper-mcp and runs the bot's tests; it does not build the bot.
+  When wiring up a new CI, have it perform the same three steps as *Deploy* above:
+  build+push both images, `sed` the tag into each manifest, `kubectl apply`.
 - **Schedule.** `cronjob.yaml` (`schedule: "0 20 * * *"`, `timeZone:
   "Asia/Jakarta"`) is the source of truth. `config.yaml`'s `bot.schedule` is now
   informational only.

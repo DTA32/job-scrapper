@@ -9,8 +9,8 @@ itself.
 
 | Where | Scheduler | Defined in |
 |---|---|---|
-| docker compose (`--profile bot`) | supercronic inside the `bot` container; crontab generated from `config.yaml` `bot.schedule` at image build | `docker-compose.yml`, `Dockerfile` `bot` stage |
-| Kubernetes | CronJob `job-scraper-bot` runs `run-scraper.sh` directly (`schedule` + `timeZone` in the manifest, `concurrencyPolicy: Forbid`, `restartPolicy: OnFailure`) | `k8s/cronjob.yaml`; image built from `Dockerfile.bot` |
+| Kubernetes (production) | CronJob `job-scraper-bot` runs `run-scraper.sh` directly (`schedule: "0 20 * * *"`, `timeZone: Asia/Jakarta`, `concurrencyPolicy: Forbid`, `restartPolicy: OnFailure`); env from `k8s/configmap.yaml` + the `job-scraper-secret` Secret | `k8s/cronjob.yaml`; image built from `Dockerfile.bot` (`k8s/README.md`) |
+| Local one-shot | None: `scripts/run_bot_once.sh` builds `job-scraper-bot:local` from `Dockerfile.bot` and runs its default command once | `scripts/run_bot_once.sh` |
 
 ## Architecture
 
@@ -18,7 +18,7 @@ itself.
 ┌────────────────────────────────────────────┐         ┌────────────────────────┐
 │ bot (node:22-slim, no LLM)                 │         │ scraper-mcp            │
 │                                            │   MCP   │ FastMCP HTTP :8080     │
-│ supercronic or k8s CronJob                 │  (HTTP) │                        │
+│ k8s CronJob, or run_bot_once.sh locally    │  (HTTP) │                        │
 │  └─ run-scraper.sh                         │         │                        │
 │      └─ node run-digest.js                 │         │                        │
 │          │                                 │         │                        │
@@ -52,9 +52,10 @@ request that stays silent until the scrape ends (see
 | `cron/*.test.js`, `cron/lib/*.test.js` | `node --test` suite (see [Tests](#tests)) |
 | `cron/test-support/` | fake SDK-built MCP server and localhost webhook stub used by the tests |
 | `seeds/requirement_samples.runner.js` | builds MongoDB's `requirement_samples`: real outlines harvested from `scrape_runs`, some labelled by hand, read by the labelled extractor test |
-| `cron/entrypoint.sh` | `exec`s supercronic on the generated crontab |
-| `cron/scraper-crontab` | generated at image build from `config.yaml` `bot.schedule`; not in git |
+| `cron/entrypoint.sh` | `exec`s supercronic; only the root `Dockerfile`'s legacy `bot` stage (claude-code + supercronic) uses it, and nothing uses that stage |
 | `cron/package.json` | runtime deps `@modelcontextprotocol/sdk` and `undici`; Node ≥ 22 |
+| `Dockerfile.bot` | the bot image: `node:22-slim` with `cron/` and `prompts/`, no LLM, no supercronic; default command runs `cron/run-scraper.sh` once |
+| `scripts/run_bot_once.sh` | local one-shot: builds `job-scraper-bot:local` from `Dockerfile.bot` and runs it once against scraper-mcp on `host.docker.internal:8080` |
 | `prompts/response_template.md` | per-job template, read each run |
 | `claude/mcp.json.example` | MCP registration for an interactive host `claude` CLI; the bot does not read it |
 
@@ -192,10 +193,10 @@ db.requirement_samples.updateOne({ _id: "<id>" }, { $set: {
 
 | Setting | When it's read | Effect |
 |---|---|---|
-| `bot.schedule` (`config.yaml`) | Bot image build time (yq → crontab) | Cron cadence supercronic uses under compose. On Kubernetes the CronJob's own `schedule` is the source of truth |
+| `bot.schedule` (`config.yaml`) | Not read | Informational only. The CronJob's `schedule` in `k8s/cronjob.yaml` is the source of truth |
 | `prompts/response_template.md` | Each run | Format applied to every job. Baked into the image, so edits ship with a rebuild |
 | `DISCORD_WEBHOOK_URL` | Each run | **Required.** Webhook the digest posts to |
-| `MCP_URL` | Each run | MCP endpoint. Default `http://job-scraper-mcp-service/mcp`; compose defaults it to `http://host.docker.internal:8080/mcp` |
+| `MCP_URL` | Each run | MCP endpoint. Default `http://job-scraper-mcp-service/mcp` (also set in `k8s/configmap.yaml`); `scripts/run_bot_once.sh` defaults it to `http://host.docker.internal:8080/mcp` |
 | `SCRAPE_TIMEOUT_MS` | Each run | Cap on the `scrape_jobs` call; default `1800000` (30 min) |
 | `TEMPLATE_PATH` | Each run | Template override; default `prompts/response_template.md` |
 | `DIGEST_DIR` | Each run | Where `jobs-<date>.md` is written; default the OS temp dir |
@@ -203,32 +204,31 @@ db.requirement_samples.updateOne({ _id: "<id>" }, { $set: {
 | `REQ_MAX_ITEMS` / `REQ_MAX_ITEM_CHARS` | Each run | Requirements bullets per job / characters per bullet; default `5` / `80` |
 | `MAX_FILE_BYTES` | Each run, by `cron/send-digest.js` | Upload cap before the digest splits; default 10 MiB |
 | `MAX_CHARS` | Each run, by `cron/send-digest.js` | Per-message cap for the **inline fallback only** — the normal attachment path has no character budget; default `1900` |
-| `TZ` | Container start | Clock supercronic schedules against and `run-scraper.sh` log timestamps use. Digest dates are always WIB |
+| `TZ` | Container start | Clock `run-scraper.sh` log timestamps use; `Asia/Jakarta` in `k8s/configmap.yaml` and by default in `run_bot_once.sh`. The CronJob's schedule follows its own `timeZone`, not `TZ`. Digest dates are always WIB |
 
 On Kubernetes these come from `k8s/configmap.yaml` (`MCP_URL`,
 `SCRAPE_TIMEOUT_MS`, `TZ`, `MAX_CHARS`, `REQ_MAX_ITEMS`, `REQ_MAX_ITEM_CHARS`)
 and the `job-scraper-secret` Secret (`DISCORD_WEBHOOK_URL`); an edited ConfigMap
-applies from the next run. Under compose they come from `.env`, but the `bot`
-service passes through only `DISCORD_WEBHOOK_URL`, `MCP_URL`,
-`SCRAPE_TIMEOUT_MS`, `MAX_CHARS`, `MAX_FILE_BYTES`, `REQ_MAX_ITEMS`,
-`REQ_MAX_ITEM_CHARS`, `BOT_VERSION` and `TZ` — add any other variable to its
-`environment:` block, then recreate the container.
+applies from the next run. Locally, `scripts/run_bot_once.sh` sources `.env`
+(values there override your shell) and passes only `DISCORD_WEBHOOK_URL`,
+`MCP_URL`, `TZ` and, when set, `SCRAPE_TIMEOUT_MS`, `MAX_CHARS`,
+`MAX_FILE_BYTES`, `REQ_MAX_ITEMS`, `REQ_MAX_ITEM_CHARS` and `BOT_VERSION` into
+the container — add any other variable to the script's `docker run`.
 
-Schedule examples (standard cron + supercronic shorthand):
+Schedule examples (`schedule` in `k8s/cronjob.yaml`, standard five-field cron):
 
 ```yaml
-schedule: "0 10 * * *"       # daily 10:00 (default; Asia/Jakarta timezone)
+schedule: "0 20 * * *"       # daily 20:00 (current; timeZone: Asia/Jakarta)
 schedule: "0 */6 * * *"      # every 6h
 schedule: "*/30 * * * *"     # every 30 min
-schedule: "@every 1h"        # supercronic shorthand
 ```
 
-The schedule is evaluated against the bot container's clock. The deploy
-workflow injects `TZ=Asia/Jakarta` by default — override by setting a
-`TZ` GitHub repo variable (e.g. `Asia/Singapore`, `Etc/UTC`).
+Kubernetes evaluates the schedule in the CronJob's `timeZone`, not the
+container's `TZ`. A changed schedule applies once the manifest is re-applied
+(see `k8s/README.md`); `config.yaml`'s `bot.schedule` changes nothing.
 
-Template, code and schedule changes ship with the image: edit → commit →
-push to main → deploy rebuilds the bot image.
+Template and code changes ship with the image: rebuild it from `Dockerfile.bot`,
+push it, and point the CronJob's `image` at the new tag (see `k8s/README.md`).
 
 ## Discord posting
 
@@ -261,7 +261,7 @@ DISCORD_WEBHOOK_URL=... DIGEST_PATH=/tmp/digest.md DIGEST_SUMMARY='test' node cr
 ```
 
 To change the destination, update `DISCORD_WEBHOOK_URL` in the Secret
-(`k8s/secret.yaml`) or your `.env`, and restart the bot.
+(`k8s/secret.yaml`, then re-apply it) or your `.env`; the next run uses it.
 
 ## Recording the run
 
@@ -297,7 +297,7 @@ The bot connects to `MCP_URL`:
 | Deployment | `MCP_URL` | How it resolves |
 |---|---|---|
 | Kubernetes | `http://job-scraper-mcp-service/mcp` (`k8s/configmap.yaml`; also the code default) | ClusterIP Service in front of the `job-scraper-mcp` Deployment |
-| docker compose | `http://host.docker.internal:8080/mcp` (compose default; override in `.env`) | `extra_hosts: "host.docker.internal:host-gateway"` maps the name to the host, where scraper-mcp listens on `:8080` (published port in dev, `network_mode: host` in prod) |
+| Local (`scripts/run_bot_once.sh`) | `http://host.docker.internal:8080/mcp` (script default; override in `.env`) | `--add-host=host.docker.internal:host-gateway` maps the name to the host (needed on Linux), where the compose `mcp` profile publishes scraper-mcp on `:8080` |
 
 FastMCP runs the sync `scrape_jobs` tool on its event loop, so the server sends
 no bytes — not even headers — until the scrape ends. Node's built-in fetch
@@ -324,15 +324,14 @@ localhost webhook) and `send-digest.test.js`. Python tests stay under `pytest`.
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | `[digest] run failed: DISCORD_WEBHOOK_URL is not set` | Env missing | Set it in `.env` or the `job-scraper-secret` Secret |
-| `[digest] run failed: cannot reach MCP server at <url>: …` | scraper-mcp down, wrong `MCP_URL`, or `extra_hosts` missing from the compose bot service | `curl http://localhost:8080/health` on the host (k8s: `kubectl get endpoints job-scraper-mcp-service`); `docker exec job-scraper-bot printenv MCP_URL` |
+| `[digest] run failed: cannot reach MCP server at <url>: …` | scraper-mcp down or wrong `MCP_URL` | `curl http://localhost:8080/health` on the host (k8s: `kubectl get endpoints job-scraper-mcp-service`); check `MCP_URL` in `k8s/configmap.yaml` or your `.env` |
 | `[digest] run failed: MCP error -32001: Request timed out` | Scrape ran longer than `SCRAPE_TIMEOUT_MS` | Raise `SCRAPE_TIMEOUT_MS`, or cut keywords, sites or `max_pages`. The server-side scrape may still finish and mark its jobs seen, so a re-run won't post them |
 | `[digest] run failed: scrape_jobs: <reason>` | `scrape_jobs` returned `{error}`: `config.yaml` failed validation | Fix the config (rules in [`configuration.md`](configuration.md)) |
 | `[digest] run failed: scrape_jobs failed: …` | The tool raised on the server | `docker logs job-scraper-mcp` / `kubectl logs deploy/job-scraper-mcp` |
 | `[digest] no new jobs; nothing to post` | Every match was already seen, or filters and recency admit nothing | Expected when nothing is new; loosen `filter` / `max_age_hours` if it persists |
 | `[digest] mongo_id is null (…); run not recorded` | Mongo unreachable when `scrape_jobs` ran | Check Mongo and `MONGO_URI` on scraper-mcp; the digest still posted |
 | `MongoDB update failed: …` | Mongo unreachable, or no run document with that id | Same; delivery is unaffected |
-| `ERROR: digest run exited with code 1` in `cron/scraper.log` | One of the failures above, or a Discord message failed | Read the lines above it |
-| Digest upload fails with 401/404 | Webhook deleted or `DISCORD_WEBHOOK_URL` wrong/truncated | Re-create the webhook in channel settings, update the Secret, restart |
+| `ERROR: digest run exited with code 1` in the run's output | One of the failures above, or a Discord message failed | Read the lines above it (`kubectl logs job/<name>`, or your terminal for a local run) |
+| Digest upload fails with 401/404 | Webhook deleted or `DISCORD_WEBHOOK_URL` wrong/truncated | Re-create the webhook in channel settings, update the Secret or `.env`; the next run uses it |
 | Digest upload fails with 413 | File over the guild's upload cap | Lower `MAX_FILE_BYTES` to match the guild's tier so the digest splits sooner |
-| Jobs arrive as plain messages, `delivery_mode: "inline"` | Every upload attempt failed; the fallback carried the run | Check the `upload of … failed:` lines in `cron/scraper.log` for the status code |
-| Cron never fires (compose) | Bad crontab syntax | `docker exec job-scraper-bot supercronic -test /workspace/scraper-bot/cron/scraper-crontab` |
+| Jobs arrive as plain messages, `delivery_mode: "inline"` | Every upload attempt failed; the fallback carried the run | Check the `upload of … failed:` lines in the run's output for the status code |

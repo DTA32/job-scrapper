@@ -2,16 +2,16 @@
 
 Personal job scraper for Indonesian job boards (JobStreet, Glints, LinkedIn,
 Indeed). Flow: a Playwright/Python scraper is exposed as an **MCP HTTP server**
-(`scraper-mcp`, port 8080); a **Discord cron bot** (Node.js + supercronic, no
-LLM) runs on a schedule, calls the MCP `scrape_jobs` tool, renders the results
+(`scraper-mcp`, port 8080); a **Discord cron bot** (Node.js, no LLM) runs daily
+as a Kubernetes CronJob, calls the MCP `scrape_jobs` tool, renders the results
 into a single markdown digest, posts it to a Discord channel as an attachment,
 and records the delivery on the run's **MongoDB** document.
 
-Four Dockerfile stages: `scraper-cli` (`python -m scraper`),
-`mcp-server` (`python -m mcp_server.server`), `bot`, plus `mongo` (MongoDB 7).
-Config-driven by `config.yaml` (keywords, sites, filters, bot schedule).
-The scheduled bot that runs on Kubernetes is built from `Dockerfile.bot` (Node.js
-only; see `k8s/README.md`), not from the root Dockerfile's `bot` stage.
+Images: `scraper-cli` (`python -m scraper`) and `mcp-server`
+(`python -m mcp_server.server`) from the root Dockerfile, `mongo` (MongoDB 7),
+and the bot from `Dockerfile.bot` (Node.js only; see `k8s/README.md`).
+Config-driven by `config.yaml` (keywords, sites, filters). The root Dockerfile's
+`bot` stage (claude-code + supercronic) is legacy and unused.
 
 # How to run locally
 
@@ -36,7 +36,7 @@ The TUI is a single Textual screen with:
 - **Env bar** — `dev` / `prod` buttons (default `dev`, from `scripts/environments.yaml`)
 - **Summary panel** — shows merged keywords, enabled sites, proxy status, mongo db/collection, masked `.env` secrets
 - **Command preview panel** — shows the exact command that will run when you press a button
-- **Action rows** — one row per scope (`all`, `bot`, `mcp`, `mongo`); columns: Start / Stop (labelled **Down** on the `all` row) / Status / Logs
+- **Action rows** — one row per scope (`all`, `mcp`, `mongo`); columns: Start / Stop (labelled **Down** on the `all` row) / Status / Logs
 - **Tests row** — dev smoke tests: Scrape / Mongo / Cron / Discord
 - Keys: `q`/`ctrl+c` quit, `c` cancel running command, `r` refresh status, `x`/`ctrl+l` clear log
 
@@ -90,25 +90,27 @@ curl http://localhost:8080/health
 # MCP on Docker
 
 The bot reads its MCP endpoint from the `MCP_URL` env var (`cron/run-digest.js`;
-code default `http://job-scraper-mcp-service/mcp`, the k8s Service).
-`docker-compose.yml` defaults it to `http://host.docker.internal:8080/mcp`
-instead of `localhost` — `localhost` inside a container refers to the container
-itself, not the host. Override it in `.env`. Nothing MCP-related is baked into
-the bot image.
+code default `http://job-scraper-mcp-service/mcp`, the k8s Service, also set in
+`k8s/configmap.yaml`). Compose has no bot service. Locally the bot runs as a
+one-off container from `scripts/run_bot_once.sh`, which defaults `MCP_URL` to
+`http://host.docker.internal:8080/mcp` instead of `localhost` — `localhost`
+inside a container refers to the container itself, not the host. Override it in
+`.env`. Nothing MCP-related is baked into the bot image.
 
-Compose wiring that makes this work:
+What makes this work:
 
-- `bot` service has `extra_hosts: ["host.docker.internal:host-gateway"]` (Linux)
-- In prod, `scraper-mcp` uses `network_mode: host`, so it listens on the host's
-  `:8080` that `host.docker.internal` resolves to
+- `scraper-mcp` publishes `8080:8080` (`docker-compose.yml`), so the host's
+  `:8080` forwards into it
+- `run_bot_once.sh` runs the bot with
+  `--add-host=host.docker.internal:host-gateway`, so the name resolves to the
+  host on Linux too
 
 # Ports used here
 
-| Service       | Port  | Bind                                      | Notes                                                    |
-| ------------- | ----- | ----------------------------------------- | -------------------------------------------------------- |
-| `scraper-mcp` | 8080  | `0.0.0.0:8080` (dev); host network (prod) | MCP HTTP; `/health` and `/mcp` endpoints                 |
-| `mongo`       | 27017 | `127.0.0.1:27017`                         | profiles `mcp`, `mongo`; data in `mongo-data` volume     |
-| `bot`         | —     | none                                      | outbound only (Discord API, `host.docker.internal:8080`) |
+| Service       | Port  | Bind                                      | Notes                                                |
+| ------------- | ----- | ----------------------------------------- | ---------------------------------------------------- |
+| `scraper-mcp` | 8080  | `0.0.0.0:8080` (dev); host network (prod) | MCP HTTP; `/health` and `/mcp` endpoints             |
+| `mongo`       | 27017 | `127.0.0.1:27017`                         | profiles `mcp`, `mongo`; data in `mongo-data` volume |
 
 # Copy the .example files
 
@@ -119,8 +121,10 @@ Compose wiring that makes this work:
 | `scripts/ssh-tunnel.sh.example` | `scripts/ssh-tunnel.sh` | reverse SOCKS proxy helper — gitignored, contains real host/user                    |
 | `claude/mcp.json.example`       | `.mcp.json`             | MCP client config for an interactive host `claude` CLI only; the bot uses `MCP_URL` |
 
-`.env` is for local Docker Compose only. Production injects all env vars through
-GitHub Actions secrets/variables — it never reads this file.
+`.env` is local only: Docker Compose reads it for the `mcp` / `mongo` profiles,
+and `scripts/run_bot_once.sh` sources it for the bot. Production never reads it:
+the VPS deploy injects env through GitHub Actions secrets/variables, and the k8s
+bot gets its env from `k8s/configmap.yaml` plus the `job-scraper-secret` Secret.
 
 **MongoDB connection URL:** the app reads `MONGO_URI` (`mcp_server/mongo.py`). You
 don't set it directly — Docker Compose derives it from `MONGO_ROOT_USER` +
@@ -246,18 +250,23 @@ docker rm -f job-scraper-mongo && docker volume rm job-scrapper_mongo-data
 # Deployment process
 
 `.github/workflows/deploy.yml` — triggers on push to `main` or manual
-`workflow_dispatch`.
+`workflow_dispatch`. It deploys only `scraper-mcp` (see
+[docs/deploy.md](docs/deploy.md)).
 
-**Build jobs** (`build-mcp` + `build-bot`, run in parallel):
+**Build job** (`build-mcp`):
 
-- Build and push each Docker image to `ghcr.io`
-- Two tags per image: rolling (`mcp-latest` / `bot-latest`) and immutable per-commit (`mcp-<sha>` / `bot-<sha>`)
+- Build the root Dockerfile's `mcp-server` target and push it to `ghcr.io`
+- Two tags: rolling `mcp-latest` and immutable per-commit `mcp-<sha>`
 - Uses GitHub Actions layer cache to speed up rebuilds
 
-**Deploy jobs** (sequential after their respective build):
+**Deploy job** (`deploy-mcp`, needs `build-mcp`): copies `docker-compose.yml` + `docker-compose.prod.yml` to the server via SCP, then SSHs in and runs `docker compose --profile mcp pull && up -d --no-build`, pinned to the immutable sha tag.
 
-1. `deploy-mcp` (needs `build-mcp`): copies `docker-compose.yml` + `docker-compose.prod.yml` to the server via SCP, then SSHs in and runs `docker compose --profile mcp pull && up -d --no-build`, pinned to the immutable sha tag
-2. `deploy-bot` (needs `build-bot` + `deploy-mcp`): same flow for `--profile bot`, injects Discord tokens and `TZ`
+**Test job** (`test-bot`): runs `npm ci && npm test` in `cron/` on Node 22. It
+gates nothing.
+
+The bot is not built or deployed by this workflow: its image is built from
+`Dockerfile.bot` and runs as the `job-scraper-bot` Kubernetes CronJob (see
+[Cron job](#cron-job) and `k8s/README.md`).
 
 # Config: config.yaml + the dev patch
 
@@ -272,7 +281,7 @@ into Docker images at build time. Key fields:
 | `max_age_hours`          | Drop jobs older than this                                       |
 | `filter.location`        | Keep only jobs matching these locations                         |
 | `requirements_max_chars` | Optional cap on each job's `requirements` outline; `~` = no cap |
-| `bot.schedule`           | Cron expression for the Discord bot (e.g. `"0 11 * * *"`)       |
+| `bot.schedule`           | Informational; the CronJob `schedule` is the source of truth    |
 | `sites.*`                | Per-site `enabled`, `limit`, `url_template`, `fields`           |
 
 The per-job Discord format is not in `config.yaml`: it lives in
@@ -301,10 +310,10 @@ bind-mounts `/tmp/config.dev.yaml` into the `scraper-mcp` container
 In **prod**, `config_merge` is `null` in `scripts/environments.yaml`, so no
 merge runs — the image-baked `config.yaml` is used directly.
 
-> **Note on `bot.schedule`:** the crontab is generated from `config.yaml` at
-> **image build time** (Dockerfile `bot` stage). Changing `bot.schedule` requires
-> a rebuild and redeploy — editing `config.yaml` on a running container has no
-> effect.
+> **Note on `bot.schedule`:** it is **informational only**. The bot runs on the
+> `schedule` and `timeZone` in `k8s/cronjob.yaml` (currently `0 20 * * *`,
+> Asia/Jakarta), which is the source of truth. To change when the bot runs, edit
+> the CronJob and `kubectl apply` it; changing `bot.schedule` has no effect.
 
 # How the filter works
 
@@ -330,33 +339,46 @@ job passes through — it is not dropped.
 
 # Cron job
 
-In the bot image, `supercronic` is the entrypoint, running
-`cron/scraper-crontab`. This file is generated at build time from `config.yaml`
-`bot.schedule` (currently `0 11 * * *` — 11:00 AM daily). Each tick executes
-`cron/run-scraper.sh`, which runs:
+**Who triggers it in prod:** the Kubernetes CronJob `job-scraper-bot`
+(`k8s/cronjob.yaml`): `schedule: "0 20 * * *"`, `timeZone: Asia/Jakarta`, env
+from `k8s/configmap.yaml` plus the `job-scraper-secret` Secret. Each run starts
+a pod from the `Dockerfile.bot` image that executes `cron/run-scraper.sh`, which
+runs:
 
 ```bash
 node /workspace/scraper-bot/cron/run-digest.js
 ```
 
-(see [The digest pipeline](#the-digest-pipeline-cronrun-digestjs)). Output is
-teed to `/workspace/scraper-bot/cron/scraper.log`. A non-zero exit is logged as
-an `ERROR` line, but the script always exits 0: a retry would scrape again after
-the run already marked its jobs as seen (and possibly posted them).
-`cron/entrypoint.sh` just `exec`s supercronic.
+(see [The digest pipeline](#the-digest-pipeline-cronrun-digestjs)). Output goes
+to the container's stdout and is also teed to
+`/workspace/scraper-bot/cron/scraper.log` inside the container. A non-zero exit
+is logged as an `ERROR` line, but the script always exits 0: a retry would
+scrape again after the run already marked its jobs as seen (and possibly posted
+them).
 
-**Who triggers it in prod:** supercronic inside the deployed `bot` container,
-automatically on the baked schedule. On Kubernetes the `job-scraper-bot` CronJob
-(`k8s/cronjob.yaml`) runs `run-scraper.sh` directly instead.
-
-**In dev**, the bot is overridden to `sleep infinity` (`docker-compose.dev.yml`),
-so it idles and does not run cron. To fire a run manually:
+Build the image (see `k8s/README.md`):
 
 ```bash
-# Via TUI: tests row → Cron
+docker build -f Dockerfile.bot -t dta32/job-scraper-bot:$TAG .
+```
+
+To fire a run on Kubernetes now:
+
+```bash
+kubectl create job --from=cronjob/job-scraper-bot manual-run
+kubectl logs -f job/manual-run
+```
+
+**Locally**, nothing is scheduled. `scripts/run_bot_once.sh` builds
+`job-scraper-bot:local` from `Dockerfile.bot` and runs it once — a real scrape
+and a real Discord post — against scraper-mcp on `host.docker.internal:8080`
+(see [How to debug the bot](#how-to-debug-the-bot)):
+
+```bash
+# Via TUI: tests row → Cron (needs scraper-mcp up)
 
 # Or directly:
-docker exec job-scraper-bot /bin/sh /workspace/scraper-bot/cron/run-scraper.sh
+scripts/run_bot_once.sh
 ```
 
 # Query MongoDB data
@@ -417,49 +439,55 @@ Stream container logs:
 
 ```bash
 docker logs -f job-scraper-mcp       # MCP server
-docker logs -f job-scraper-bot       # Discord cron bot
 docker logs -f job-scraper-mongo     # MongoDB
 ```
 
 Via TUI: select a scope row → **Logs** (runs `docker compose … logs -f --tail=200 <services>`).
 
-Read the cron run log inside the bot container:
+The bot has no long-running container. On Kubernetes, read a run's pod logs:
 
 ```bash
-docker exec job-scraper-bot cat /workspace/scraper-bot/cron/scraper.log
+kubectl logs -f job/manual-run       # a run started with kubectl create job
+kubectl get jobs                     # scheduled runs, then: kubectl logs job/<name>
 ```
+
+A local run (`scripts/run_bot_once.sh`) prints to your terminal. The
+`cron/scraper.log` that `run-scraper.sh` also writes lives inside the container
+and disappears with it.
 
 # How to debug the bot
 
-The `bot` service (`docker-compose.yml`) needs `DISCORD_WEBHOOK_URL` from `.env`
-and reaches the MCP server at `MCP_URL` (default
-`http://host.docker.internal:8080/mcp`). No Claude session is involved.
+The bot image (`Dockerfile.bot`) needs `DISCORD_WEBHOOK_URL` and reaches the
+MCP server at `MCP_URL`. No Claude session is involved, and there is no bot
+container to exec into: each run is a one-off container.
 
-In dev the bot idles (`sleep infinity`), so you can exec in freely.
+**Start scraper-mcp first** (TUI → dev → `mcp` → Start, or the raw command in
+[How to run locally](#how-to-run-locally)); it publishes `:8080` on the host.
 
-**Start the bot container** (TUI → dev → `bot` → Start, or):
-
-```bash
-docker compose -f docker-compose.yml -f docker-compose.dev.yml --profile bot up --build -d
-```
-
-**Check which MCP target is active:**
+**Build the bot image:**
 
 ```bash
-docker exec job-scraper-bot printenv MCP_URL
+docker build -f Dockerfile.bot -t job-scraper-bot:local .
 ```
-
-To point the bot elsewhere, set `MCP_URL` in `.env` and recreate the container.
 
 **Fire one run by hand** (real scrape, real Discord post):
 
 ```bash
-# the cron entrypoint: tees to cron/scraper.log, always exits 0
-docker exec job-scraper-bot /bin/sh /workspace/scraper-bot/cron/run-scraper.sh
+# the image's default command (run-scraper.sh: always exits 0);
+# builds the image first, SKIP_BUILD=1 reuses job-scraper-bot:local
+scripts/run_bot_once.sh
 
-# the digest alone: output on your terminal, real exit code
-docker exec job-scraper-bot node /workspace/scraper-bot/cron/run-digest.js
+# the digest alone: same env handling, and the script exits with its exit code
+scripts/run_bot_once.sh node /workspace/scraper-bot/cron/run-digest.js
 ```
+
+`run_bot_once.sh` sources `.env` from the repo root if present (values in `.env`
+override your shell), requires `DISCORD_WEBHOOK_URL`, defaults `MCP_URL` to
+`http://host.docker.internal:8080/mcp` and `TZ` to `Asia/Jakarta`, and passes
+`SCRAPE_TIMEOUT_MS`, `MAX_CHARS`, `MAX_FILE_BYTES`, `REQ_MAX_ITEMS`,
+`REQ_MAX_ITEM_CHARS` and `BOT_VERSION` through when set. To point the bot
+elsewhere, set `MCP_URL` in `.env`. Output goes to your terminal; the
+`cron/scraper.log` inside the container is removed with it.
 
 A run logs `[digest] …` progress lines, a `RESULT {…}` line with the Discord
 delivery outcome when there was something to post, and `MongoDB update failed: …`
@@ -484,12 +512,12 @@ the `/health` HTTP endpoint.
 
 **Quick smoke tests** (TUI tests row, no full cron run needed):
 
-| Button      | What it tests                                                                               |
-| ----------- | ------------------------------------------------------------------------------------------- |
-| **Scrape**  | Runs `python -m scraper` in `scraper-mcp` — scrape only, no Mongo write, no Discord post    |
-| **Mongo**   | Inserts + reads + drops a throwaway document in `scraper-mcp` via the real Mongo connection |
-| **Discord** | Posts a throwaway digest via `cron/send-digest.js` from the bot container — the real send path |
-| **Cron**    | Fires the full cron job once (`run-scraper.sh`) — real scrape + real Discord posts          |
+| Button      | What it tests                                                                                                                                                     |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Scrape**  | Runs `python -m scraper` in `scraper-mcp` — scrape only, no Mongo write, no Discord post                                                                          |
+| **Mongo**   | Inserts + reads + drops a throwaway document in `scraper-mcp` via the real Mongo connection                                                                       |
+| **Discord** | Runs `scripts/run_bot_once.sh` with a snippet that posts a throwaway digest via `cron/send-digest.js` in a one-off container — the real send path    |
+| **Cron**    | Runs `scripts/run_bot_once.sh` — real scrape + real Discord post; needs scraper-mcp up                                                                            |
 
 # The digest pipeline (cron/run-digest.js)
 
@@ -589,19 +617,16 @@ Set these in your repository's **Settings → Secrets and variables**.
 
 | Secret                | Required by | Purpose                                |
 | --------------------- | ----------- | -------------------------------------- |
-| `SSH_HOST`            | deploy jobs | Server IP or hostname                  |
-| `SSH_USER`            | deploy jobs | SSH login user                         |
-| `SSH_PRIVATE_KEY`     | deploy jobs | Private key for SSH authentication     |
+| `SSH_HOST`            | deploy-mcp  | Server IP or hostname                  |
+| `SSH_USER`            | deploy-mcp  | SSH login user                         |
+| `SSH_PRIVATE_KEY`     | deploy-mcp  | Private key for SSH authentication     |
 | `MONGO_ROOT_PASSWORD` | deploy-mcp  | MongoDB root password                  |
-| `DISCORD_BOT_TOKEN`   | deploy-bot  | Discord bot application token          |
-| `DISCORD_CHANNEL_ID`  | deploy-bot  | Target channel ID for job posts        |
-| `GITHUB_TOKEN`        | build jobs  | Auto-provided; used to push to ghcr.io |
+| `GITHUB_TOKEN`        | build-mcp   | Auto-provided; used to push to ghcr.io |
 
 **Variables** (plain text, shown in logs):
 
-| Variable                | Default        | Purpose                        |
-| ----------------------- | -------------- | ------------------------------ |
-| `MONGO_ROOT_USER`       | `admin`        | MongoDB root username          |
-| `MONGO_DB_NAME`         | `job_scraper`  | Database name                  |
-| `MONGO_COLLECTION_NAME` | `scrape_runs`  | Scrape history collection      |
-| `TZ`                    | `Asia/Jakarta` | Timezone for the bot container |
+| Variable                | Default       | Purpose                   |
+| ----------------------- | ------------- | ------------------------- |
+| `MONGO_ROOT_USER`       | `admin`       | MongoDB root username     |
+| `MONGO_DB_NAME`         | `job_scraper` | Database name             |
+| `MONGO_COLLECTION_NAME` | `scrape_runs` | Scrape history collection |

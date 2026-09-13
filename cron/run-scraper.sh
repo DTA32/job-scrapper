@@ -1,10 +1,11 @@
 #!/bin/sh
 # Cron entrypoint: runs one digest (scrape via MCP -> Discord -> Mongo) and logs all output.
-# POSIX sh (not bash): supercronic/docker invoke this as `/bin/sh run-scraper.sh`,
-# and the bot image's /bin/sh is dash — so no bashisms (e.g. ${PIPESTATUS}).
+# POSIX sh (not bash): the k8s CronJob and scripts/run_bot_once.sh run this as
+# `/bin/sh run-scraper.sh`, and the bot image's /bin/sh is dash — so no bashisms
+# (e.g. ${PIPESTATUS}).
 #
 # All configuration is environment (MCP_URL, DISCORD_WEBHOOK_URL, SCRAPE_TIMEOUT_MS,
-# REQ_MAX_ITEMS, ...), injected by the k8s ConfigMap/Secret or docker-compose. The
+# REQ_MAX_ITEMS, ...), injected by the k8s ConfigMap/Secret or scripts/run_bot_once.sh. The
 # header of cron/run-digest.js lists every variable.
 LOG=/workspace/scraper-bot/cron/scraper.log
 DIGEST=/workspace/scraper-bot/cron/run-digest.js
