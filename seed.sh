@@ -28,5 +28,6 @@ else
 fi
 
 NODE_PATH="$(npm root -g 2>/dev/null || true)" node "${SCRIPT_DIR}/seeds/wilayah.runner.js"
+NODE_PATH="$(npm root -g 2>/dev/null || true)" node "${SCRIPT_DIR}/seeds/requirement_samples.runner.js" harvest
 
 echo "[seed] all done"
