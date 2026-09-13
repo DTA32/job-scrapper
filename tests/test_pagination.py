@@ -8,6 +8,7 @@ from scraper.dedup import dedup_key
 from scraper.runner import run_one
 from scraper.sites._pagination import with_query_param
 from scraper.sites.base import Scraper
+from scraper.sites.linkedin import LinkedinScraper
 
 _FIELDS = frozenset({"title", "company", "url"})
 
@@ -127,3 +128,14 @@ def test_repeat_page_stops_pagination(tmp_path: Path):
 
     assert {j["title"] for j in out["jobs"]} == {"A", "B"}
     assert len(fetcher.urls) == 2  # page 0, then page 1 detected as a repeat → stop
+
+
+def test_linkedin_pages_advance_by_the_ten_card_batch():
+    # The guest API serves 10 cards per request; a bigger step skips jobs.
+    url = (
+        "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=go&start=0"
+    )
+    scraper = LinkedinScraper(url=url, limit=10, max_pages=3)
+    assert scraper.page_url(0) == url
+    assert "start=10" in scraper.page_url(1)
+    assert "start=20" in scraper.page_url(2)

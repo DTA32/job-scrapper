@@ -11,9 +11,10 @@ from .base import Scraper
 
 _JOB_ID_RE = re.compile(r"/jobs/view/[^/]*?-?(\d{6,})(?:/|\?|$)")
 
-# LinkedIn's guest jobs API returns a fixed batch of cards per request; deeper
-# pages are requested by advancing the `start` offset.
-_LINKEDIN_PAGE_SIZE = 25
+# LinkedIn's guest jobs API returns 10 cards per request; deeper pages are requested
+# by advancing the `start` offset by that batch. Verified 2026-09-13: start=0/10/20
+# returned 10/10/4 distinct jobs and start=25 none, so a step of 25 skipped 11-25.
+_LINKEDIN_PAGE_SIZE = 10
 
 
 def _extract_job_id(url: str | None) -> str | None:
