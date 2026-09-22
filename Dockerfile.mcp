@@ -1,7 +1,7 @@
 # Long-running MCP HTTP server (port 8080).
 # Requires the shared base built first:  docker build -f Dockerfile.base -t job-scraper-base .
 
-FROM dta32/job-scrapper-orangemangodimz-base:v1.0.1 AS mcp-server
+FROM ghcr.io/pt-sinan-akbar/job-scraper-base:c908aa76 AS mcp-server
 
 USER root
 COPY --chown=pwuser:pwuser mcp_server ./mcp_server
